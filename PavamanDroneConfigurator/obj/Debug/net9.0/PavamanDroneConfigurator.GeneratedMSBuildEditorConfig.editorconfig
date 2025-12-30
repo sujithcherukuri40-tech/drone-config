@@ -1,0 +1,61 @@
+is_global = true
+build_property.AvaloniaNameGeneratorIsEnabled = true
+build_property.AvaloniaNameGeneratorBehavior = InitializeComponent
+build_property.AvaloniaNameGeneratorDefaultFieldModifier = internal
+build_property.AvaloniaNameGeneratorFilterByPath = *
+build_property.AvaloniaNameGeneratorFilterByNamespace = *
+build_property.AvaloniaNameGeneratorViewFileNamingStrategy = NamespaceAndClassName
+build_property.AvaloniaNameGeneratorAttachDevTools = true
+build_property.TargetFramework = net9.0
+build_property.TargetPlatformMinVersion = 
+build_property.UsingMicrosoftNETSdkWeb = 
+build_property.ProjectTypeGuids = 
+build_property.InvariantGlobalization = 
+build_property.PlatformNeutralAssembly = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property.RootNamespace = PavamanDroneConfigurator
+build_property.ProjectDir = C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.EffectiveAnalysisLevelStyle = 9.0
+build_property.EnableCodeStyleSeverity = 
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/App.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Styles/AppStyles.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Views/ConnectionView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Views/FlightModesView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Views/MainWindow.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Views/MotorEscView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Views/ParametersView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Views/PidTuningView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Views/PowerView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Views/RcCalibrationView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Views/SafetyView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Views/SensorsView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/nithw/OneDrive/Desktop/Drone-config/PavamanDroneConfigurator/src/PavamanDroneConfigurator/Views/SprayingConfigView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml

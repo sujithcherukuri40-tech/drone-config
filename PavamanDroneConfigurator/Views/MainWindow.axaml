@@ -1,0 +1,113 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PavamanDroneConfigurator.ViewModels"
+        xmlns:views="using:PavamanDroneConfigurator.Views"
+        x:Class="PavamanDroneConfigurator.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Pavaman Drone Configurator"
+        Width="1400" Height="900"
+        Background="#F5F5F5">
+
+    <Grid ColumnDefinitions="220,*">
+        <!-- Left Navigation Sidebar -->
+        <Border Grid.Column="0" Background="#FFFFFF" 
+                BorderBrush="#E0E0E0" BorderThickness="0,0,1,0">
+            <StackPanel Margin="0,60,0,0">
+                <TextBlock Text="NAVIGATION" FontSize="11" FontWeight="Bold" 
+                          Foreground="#757575" Margin="16,0,0,8"/>
+                
+                <Button Classes="nav-item" Command="{Binding NavigateToConnectionCommand}">
+                    CONNECTION
+                </Button>
+                
+                <Button Classes="nav-item" Command="{Binding NavigateToSensorsCommand}">
+                    SENSORS
+                </Button>
+                
+                <Button Classes="nav-item" Command="{Binding NavigateToSafetyCommand}">
+                    SAFETY
+                </Button>
+                
+                <Button Classes="nav-item" Command="{Binding NavigateToFlightModesCommand}">
+                    FLIGHT MODES
+                </Button>
+                
+                <Button Classes="nav-item" Command="{Binding NavigateToRcCalibrationCommand}">
+                    RC CALIBRATION
+                </Button>
+                
+                <Button Classes="nav-item" Command="{Binding NavigateToMotorEscCommand}">
+                    MOTOR AND ESC
+                </Button>
+                
+                <Button Classes="nav-item" Command="{Binding NavigateToPowerCommand}">
+                    POWER
+                </Button>
+                
+                <Button Classes="nav-item" Command="{Binding NavigateToSprayingConfigCommand}">
+                    SPRAYING CONFIG
+                </Button>
+                
+                <Button Classes="nav-item" Command="{Binding NavigateToPidTuningCommand}">
+                    PID TUNING
+                </Button>
+                
+                <Button Classes="nav-item" Command="{Binding NavigateToParametersCommand}">
+                    PARAMETERS
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Column="1" RowDefinitions="60,*">
+            <!-- Header Bar with Green Gradient -->
+            <Border Grid.Row="0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#4CAF50" Offset="0"/>
+                        <GradientStop Color="#81C784" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <TextBlock Text="PAVAMAN DRONE CONFIGURATOR" 
+                          FontSize="20" FontWeight="Bold" Foreground="White"
+                          VerticalAlignment="Center" Margin="24,0"/>
+            </Border>
+
+            <!-- Content -->
+            <ContentControl Grid.Row="1" Content="{Binding CurrentView}" Margin="16">
+                <ContentControl.DataTemplates>
+                    <DataTemplate DataType="vm:ConnectionViewModel">
+                        <views:ConnectionView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:SensorsViewModel">
+                        <views:SensorsView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:SafetyViewModel">
+                        <views:SafetyView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:FlightModesViewModel">
+                        <views:FlightModesView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:RcCalibrationViewModel">
+                        <views:RcCalibrationView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:MotorEscViewModel">
+                        <views:MotorEscView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:PowerViewModel">
+                        <views:PowerView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:SprayingConfigViewModel">
+                        <views:SprayingConfigView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:PidTuningViewModel">
+                        <views:PidTuningView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:ParametersViewModel">
+                        <views:ParametersView/>
+                    </DataTemplate>
+                </ContentControl.DataTemplates>
+            </ContentControl>
+        </Grid>
+    </Grid>
+</Window>

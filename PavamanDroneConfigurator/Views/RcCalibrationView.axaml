@@ -1,0 +1,12 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PavamanDroneConfigurator.ViewModels"
+             x:Class="PavamanDroneConfigurator.Views.RcCalibrationView"
+             x:DataType="vm:RcCalibrationViewModel">
+    <StackPanel Margin="16">
+        <TextBlock Text="RC CALIBRATION" Classes="section-header"/>
+        <Border Classes="card">
+            <TextBlock Text="RC Calibration configuration coming soon..." Foreground="#757575"/>
+        </Border>
+    </StackPanel>
+</UserControl>

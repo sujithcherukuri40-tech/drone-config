@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PavamanDroneConfigurator.ViewModels"
+             x:Class="PavamanDroneConfigurator.Views.ParametersView"
+             x:DataType="vm:ParametersViewModel">
+    <StackPanel Margin="16">
+        <TextBlock Text="PARAMETERS" Classes="section-header"/>
+        <Border Classes="card">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Parameters management" Foreground="#757575"/>
+                <Button Classes="primary" Content="Reset to Defaults" 
+                       Command="{Binding ResetParametersCommand}"/>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

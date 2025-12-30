@@ -1,0 +1,12 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PavamanDroneConfigurator.ViewModels"
+             x:Class="PavamanDroneConfigurator.Views.SprayingConfigView"
+             x:DataType="vm:SprayingConfigViewModel">
+    <StackPanel Margin="16">
+        <TextBlock Text="SPRAYING CONFIG" Classes="section-header"/>
+        <Border Classes="card">
+            <TextBlock Text="Spraying configuration coming soon..." Foreground="#757575"/>
+        </Border>
+    </StackPanel>
+</UserControl>

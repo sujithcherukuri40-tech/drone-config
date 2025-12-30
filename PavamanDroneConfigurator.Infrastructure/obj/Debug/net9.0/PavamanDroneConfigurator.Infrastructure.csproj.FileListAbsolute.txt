@@ -1,0 +1,16 @@
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\bin\Debug\net9.0\PavamanDroneConfigurator.Infrastructure.deps.json
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\bin\Debug\net9.0\PavamanDroneConfigurator.Infrastructure.dll
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\bin\Debug\net9.0\PavamanDroneConfigurator.Infrastructure.pdb
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\bin\Debug\net9.0\PavamanDroneConfigurator.Core.dll
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\bin\Debug\net9.0\PavamanDroneConfigurator.Core.pdb
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\obj\Debug\net9.0\PavamanDroneConfigurator.Infrastructure.csproj.AssemblyReference.cache
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\obj\Debug\net9.0\PavamanDroneConfigurator.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\obj\Debug\net9.0\PavamanDroneConfigurator.Infrastructure.AssemblyInfoInputs.cache
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\obj\Debug\net9.0\PavamanDroneConfigurator.Infrastructure.AssemblyInfo.cs
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\obj\Debug\net9.0\PavamanDroneConfigurator.Infrastructure.csproj.CoreCompileInputs.cache
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\obj\Debug\net9.0\PavamanDroneConfigurator.Infrastructure.sourcelink.json
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\obj\Debug\net9.0\PavamanD.AA0D4DBC.Up2Date
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\obj\Debug\net9.0\PavamanDroneConfigurator.Infrastructure.dll
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\obj\Debug\net9.0\refint\PavamanDroneConfigurator.Infrastructure.dll
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\obj\Debug\net9.0\PavamanDroneConfigurator.Infrastructure.pdb
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Infrastructure\obj\Debug\net9.0\ref\PavamanDroneConfigurator.Infrastructure.dll

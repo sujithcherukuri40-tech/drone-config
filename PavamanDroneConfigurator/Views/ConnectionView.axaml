@@ -1,0 +1,173 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PavamanDroneConfigurator.ViewModels"
+             x:Class="PavamanDroneConfigurator.Views.ConnectionView"
+             x:DataType="vm:ConnectionViewModel">
+
+    <ScrollViewer>
+        <Grid ColumnDefinitions="*,*" Margin="16">
+            <!-- Left Column: Connection Settings -->
+            <StackPanel Grid.Column="0" MaxWidth="500" Margin="0,0,16,0">
+                <TextBlock Text="CONNECTION SETTINGS" Classes="section-header"/>
+
+                <Border Classes="card">
+                    <StackPanel Spacing="16">
+                        <!-- Connection Type -->
+                        <StackPanel>
+                            <TextBlock Text="COMM LINK SETTINGS" Classes="label"/>
+                            <ComboBox SelectedIndex="{Binding SelectedConnectionType}" MinWidth="250">
+                                <ComboBoxItem Content="Serial"/>
+                                <ComboBoxItem Content="TCP"/>
+                                <ComboBoxItem Content="UDP"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- Serial Settings -->
+                        <StackPanel IsVisible="{Binding SelectedConnectionType}">
+                            <StackPanel Spacing="16">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Serial Port" Classes="label"/>
+                                        <Button Content="Refresh" Command="{Binding RefreshPortsCommand}" 
+                                               Padding="8,4" FontSize="11"/>
+                                    </StackPanel>
+                                    <ComboBox ItemsSource="{Binding AvailablePorts}" 
+                                             SelectedItem="{Binding SelectedPort}" 
+                                             MinWidth="250"/>
+                                </StackPanel>
+
+                                <StackPanel>
+                                    <TextBlock Text="Baud Rate" Classes="label"/>
+                                    <ComboBox ItemsSource="{Binding AvailableBaudRates}" 
+                                             SelectedItem="{Binding SelectedBaudRate}" 
+                                             MinWidth="250"/>
+                                </StackPanel>
+
+                                <StackPanel>
+                                    <TextBlock Text="Data Bits" Classes="label"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <ToggleButton Classes="toggle-group" Content="6"/>
+                                        <ToggleButton Classes="toggle-group" Content="7"/>
+                                        <ToggleButton Classes="toggle-group" Content="8" IsChecked="True"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel>
+                                    <TextBlock Text="Parity" Classes="label"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <ToggleButton Classes="toggle-group" Content="None" IsChecked="True"/>
+                                        <ToggleButton Classes="toggle-group" Content="Even"/>
+                                        <ToggleButton Classes="toggle-group" Content="Odd"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Status and Parameter Info -->
+                        <StackPanel>
+                            <TextBlock Text="Status" Classes="label"/>
+                            <TextBlock Text="{Binding ConnectionStatus}" Classes="status"/>
+                        </StackPanel>
+
+                        <StackPanel IsVisible="{Binding IsLoadingParameters}">
+                            <TextBlock Text="Loading Parameters..." Classes="label"/>
+                            <ProgressBar Value="{Binding ParametersLoaded}" Maximum="{Binding TotalParameters}" Height="6"/>
+                            <TextBlock Text="{Binding CurrentParameter}" FontSize="11" Foreground="#757575" Margin="0,4,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel IsVisible="{Binding IsConnected}">
+                            <TextBlock Text="Frame Type" Classes="label"/>
+                            <TextBlock Text="{Binding FrameType}" FontWeight="SemiBold"/>
+                        </StackPanel>
+
+                        <!-- Connect/Disconnect Buttons -->
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
+                            <Button Classes="primary" Content="Connect" 
+                                   Command="{Binding ConnectCommand}"
+                                   IsEnabled="{Binding !IsConnected}"/>
+                            <Button Classes="secondary" Content="Disconnect" 
+                                   Command="{Binding DisconnectCommand}"
+                                   IsEnabled="{Binding IsConnected}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Right Column: Realtime Telemetry Data -->
+            <StackPanel Grid.Column="1" MaxWidth="500">
+                <TextBlock Text="REALTIME TELEMETRY DATA" Classes="section-header"/>
+
+                <!-- Battery Info -->
+                <Border Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="BATTERY" FontWeight="Bold" FontSize="14" Foreground="#00BCD4"/>
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Voltage:" Classes="label"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Voltage, StringFormat={}{0:F2} V}" FontWeight="SemiBold"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Current:" Classes="label"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Current, StringFormat={}{0:F2} A}" FontWeight="SemiBold"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Remaining:" Classes="label"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding BatteryRemaining, StringFormat={}{0}%}" FontWeight="SemiBold"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- GPS Info -->
+                <Border Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="GPS" FontWeight="Bold" FontSize="14" Foreground="#00BCD4"/>
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Latitude:" Classes="label"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Latitude, StringFormat={}{0:F7}}" FontWeight="SemiBold"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Longitude:" Classes="label"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Longitude, StringFormat={}{0:F7}}" FontWeight="SemiBold"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Altitude:" Classes="label"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Altitude, StringFormat={}{0:F2} m}" FontWeight="SemiBold"/>
+                            
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Satellites:" Classes="label"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SatelliteCount}" FontWeight="SemiBold"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Attitude Info -->
+                <Border Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="ATTITUDE" FontWeight="Bold" FontSize="14" Foreground="#00BCD4"/>
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Roll:" Classes="label"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Roll, StringFormat={}{0:F1}°}" FontWeight="SemiBold"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Pitch:" Classes="label"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Pitch, StringFormat={}{0:F1}°}" FontWeight="SemiBold"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Yaw:" Classes="label"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Yaw, StringFormat={}{0:F1}°}" FontWeight="SemiBold"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Status Info -->
+                <Border Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="STATUS" FontWeight="Bold" FontSize="14" Foreground="#00BCD4"/>
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Flight Mode:" Classes="label"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding FlightMode}" FontWeight="SemiBold"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Armed:" Classes="label"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding IsArmed}" FontWeight="SemiBold"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Ground Speed:" Classes="label"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding GroundSpeed, StringFormat={}{0:F1} m/s}" FontWeight="SemiBold"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

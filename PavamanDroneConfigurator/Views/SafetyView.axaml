@@ -1,0 +1,161 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PavamanDroneConfigurator.ViewModels"
+             x:Class="PavamanDroneConfigurator.Views.SafetyView"
+             x:DataType="vm:SafetyViewModel">
+
+    <ScrollViewer>
+        <StackPanel MaxWidth="900" Margin="16">
+            <TextBlock Text="SAFETY SETTINGS" Classes="section-header" Foreground="#00BCD4"/>
+
+            <!-- Tab Buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,24">
+                <Button Classes="tab" Classes.active="{Binding SelectedTab}"
+                       Content="BATTERY" Command="{Binding UpdateBatterySettingsCommand}"/>
+                <Button Classes="tab" Classes.active="{Binding SelectedTab}"
+                       Content="RTL" Command="{Binding UpdateRtlSettingsCommand}"/>
+                <Button Classes="tab" Classes.active="{Binding SelectedTab}"
+                       Content="GEOFENCE" Command="{Binding UpdateGeofenceSettingsCommand}"/>
+                <Button Classes="tab" Content="ARMING CHECKS"/>
+                <Button Classes="tab" Content="PARACHUTE"/>
+                <Button Classes="tab" Content="TERRAIN"/>
+            </StackPanel>
+
+            <!-- Battery Tab Content -->
+            <Border Classes="card" IsVisible="{Binding SelectedTab}">
+                <StackPanel Spacing="20">
+                    <TextBlock Text="Battery Failsafe Settings" FontSize="16" FontWeight="SemiBold"/>
+
+                    <!-- Critical Action -->
+                    <StackPanel>
+                        <TextBlock Text="Critical Action" Classes="label"/>
+                        <ComboBox MinWidth="250">
+                            <ComboBoxItem Content="LAND" IsSelected="True"/>
+                            <ComboBoxItem Content="RTL"/>
+                            <ComboBoxItem Content="SMART RTL"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Critical Voltage Threshold -->
+                    <StackPanel>
+                        <TextBlock Text="Critical Voltage Threshold" Classes="label"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBox Text="{Binding CriticalVoltageThreshold}" MinWidth="150"/>
+                            <TextBlock Text="V" VerticalAlignment="Center" Foreground="#757575"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Critical mAh Threshold -->
+                    <StackPanel>
+                        <TextBlock Text="Critical mAh Threshold" Classes="label"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBox Text="{Binding CriticalMahThreshold}" MinWidth="150"/>
+                            <TextBlock Text="mAh" VerticalAlignment="Center" Foreground="#757575"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Update Button -->
+                    <Button Classes="primary" Content="Update" 
+                           Command="{Binding UpdateBatterySettingsCommand}" 
+                           Margin="0,16,0,0"/>
+
+                    <!-- Separator -->
+                    <Separator Margin="0,20"/>
+
+                    <!-- Failsafe Trigger Section -->
+                    <TextBlock Text="Failsafe Trigger" FontSize="16" FontWeight="SemiBold"/>
+
+                    <!-- Ground Station Failsafe -->
+                    <StackPanel>
+                        <TextBlock Text="Ground Station Failsafe" Classes="label"/>
+                        <ComboBox MinWidth="250">
+                            <ComboBoxItem Content="Disabled"/>
+                            <ComboBoxItem Content="Enabled always RTL" IsSelected="True"/>
+                            <ComboBoxItem Content="Enabled continue with mission"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Throttle Failsafe -->
+                    <StackPanel>
+                        <TextBlock Text="Throttle Failsafe" Classes="label"/>
+                        <ComboBox MinWidth="250">
+                            <ComboBoxItem Content="Disabled"/>
+                            <ComboBoxItem Content="Always RTL" IsSelected="True"/>
+                            <ComboBoxItem Content="Continue with mission in auto mode"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- PWM Threshold -->
+                    <StackPanel>
+                        <TextBlock Text="PWM Threshold" Classes="label"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBox Text="{Binding ThrottlePwmThreshold}" MinWidth="150"/>
+                            <TextBlock Text="Amp" VerticalAlignment="Center" Foreground="#757575"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- RTL Tab Content -->
+            <Border Classes="card" IsVisible="{Binding SelectedTab}">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Return to Launch Settings" FontSize="16" FontWeight="SemiBold"/>
+
+                    <StackPanel>
+                        <TextBlock Text="RTL Altitude (m)" Classes="label"/>
+                        <TextBox Text="{Binding Settings.RtlAltitude}" MinWidth="250"/>
+                    </StackPanel>
+
+                    <StackPanel>
+                        <TextBlock Text="RTL Speed (m/s)" Classes="label"/>
+                        <TextBox Text="{Binding Settings.RtlSpeed}" MinWidth="250"/>
+                    </StackPanel>
+
+                    <StackPanel>
+                        <CheckBox Content="Climb to RTL altitude first" 
+                                 IsChecked="{Binding Settings.RtlClimbFirst}"/>
+                    </StackPanel>
+
+                    <Button Classes="primary" Content="Update" 
+                           Command="{Binding UpdateRtlSettingsCommand}" 
+                           Margin="0,16,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Geofence Tab Content -->
+            <Border Classes="card" IsVisible="{Binding SelectedTab}">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Geofence Settings" FontSize="16" FontWeight="SemiBold"/>
+
+                    <StackPanel>
+                        <CheckBox Content="Enable Geofence" 
+                                 IsChecked="{Binding Settings.GeofenceEnabled}"/>
+                    </StackPanel>
+
+                    <StackPanel>
+                        <TextBlock Text="Maximum Altitude (m)" Classes="label"/>
+                        <TextBox Text="{Binding Settings.MaxAltitude}" MinWidth="250"/>
+                    </StackPanel>
+
+                    <StackPanel>
+                        <TextBlock Text="Maximum Radius (m)" Classes="label"/>
+                        <TextBox Text="{Binding Settings.MaxRadius}" MinWidth="250"/>
+                    </StackPanel>
+
+                    <StackPanel>
+                        <TextBlock Text="Geofence Action" Classes="label"/>
+                        <ComboBox MinWidth="250">
+                            <ComboBoxItem Content="Report Only"/>
+                            <ComboBoxItem Content="RTL" IsSelected="True"/>
+                            <ComboBoxItem Content="Land"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <Button Classes="primary" Content="Update" 
+                           Command="{Binding UpdateGeofenceSettingsCommand}" 
+                           Margin="0,16,0,0"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

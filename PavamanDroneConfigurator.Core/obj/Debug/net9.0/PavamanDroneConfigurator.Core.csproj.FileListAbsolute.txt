@@ -1,0 +1,13 @@
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\bin\Debug\net9.0\PavamanDroneConfigurator.Core.deps.json
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\bin\Debug\net9.0\PavamanDroneConfigurator.Core.dll
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\bin\Debug\net9.0\PavamanDroneConfigurator.Core.pdb
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\obj\Debug\net9.0\PavamanDroneConfigurator.Core.csproj.AssemblyReference.cache
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\obj\Debug\net9.0\PavamanDroneConfigurator.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\obj\Debug\net9.0\PavamanDroneConfigurator.Core.AssemblyInfoInputs.cache
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\obj\Debug\net9.0\PavamanDroneConfigurator.Core.AssemblyInfo.cs
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\obj\Debug\net9.0\PavamanDroneConfigurator.Core.csproj.CoreCompileInputs.cache
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\obj\Debug\net9.0\PavamanDroneConfigurator.Core.sourcelink.json
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\obj\Debug\net9.0\PavamanDroneConfigurator.Core.dll
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\obj\Debug\net9.0\refint\PavamanDroneConfigurator.Core.dll
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\obj\Debug\net9.0\PavamanDroneConfigurator.Core.pdb
+C:\Users\nithw\OneDrive\Desktop\Drone-config\PavamanDroneConfigurator\src\PavamanDroneConfigurator.Core\obj\Debug\net9.0\ref\PavamanDroneConfigurator.Core.dll

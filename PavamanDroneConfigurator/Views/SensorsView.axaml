@@ -1,0 +1,113 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PavamanDroneConfigurator.ViewModels"
+             x:Class="PavamanDroneConfigurator.Views.SensorsView"
+             x:DataType="vm:SensorsViewModel">
+
+    <ScrollViewer>
+        <StackPanel MaxWidth="900" Margin="16">
+            <TextBlock Text="SENSORS" Classes="section-header" Foreground="#00BCD4"/>
+
+            <!-- Tab Buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,24">
+                <Button Classes="tab" Classes.active="{Binding SelectedTab}"
+                       Content="ACCELEROMETER" Command="{Binding CalibrateAccelerometerCommand}"/>
+                <Button Classes="tab" Classes.active="{Binding SelectedTab}"
+                       Content="COMPASS" Command="{Binding CalibrateCompassCommand}"/>
+                <Button Classes="tab" Classes.active="{Binding SelectedTab}"
+                       Content="LEVEL HORIZON" Command="{Binding CalibrateLevelHorizonCommand}"/>
+                <Button Classes="tab" Classes.active="{Binding SelectedTab}"
+                       Content="PRESSURE" Command="{Binding CalibratePressureCommand}"/>
+                <Button Classes="tab" Content="FLOW"/>
+            </StackPanel>
+
+            <!-- Accelerometer Tab Content -->
+            <Border Classes="card" IsVisible="{Binding SelectedTab}">
+                <StackPanel Spacing="16">
+                    <!-- Status Message -->
+                    <TextBlock Text="{Binding StatusMessage}" Classes="status"/>
+
+                    <!-- Instructions -->
+                    <TextBlock TextWrapping="Wrap" Foreground="#757575">
+                        <Run Text="FOLLOW THE INSTRUCTIONS - "/>
+                        <Run Text="To calibrate accelerometer please click on calibrate button"/>
+                    </TextBlock>
+
+                    <!-- Progress Bar -->
+                    <ProgressBar Value="{Binding CalibrationProgress}" 
+                                Maximum="100" Height="8"
+                                IsVisible="{Binding IsCalibrating}"/>
+
+                    <!-- Action Buttons -->
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
+                        <Button Classes="primary" Content="Calibrate" 
+                               Command="{Binding CalibrateAccelerometerCommand}"
+                               IsEnabled="{Binding !IsCalibrating}"/>
+                        <Button Classes="secondary" Content="Next"/>
+                        <Button Classes="secondary" Content="Reboot"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Compass Tab Content -->
+            <Border Classes="card" IsVisible="{Binding SelectedTab}">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="{Binding StatusMessage}" Classes="status"/>
+                    <TextBlock Text="FOLLOW THE INSTRUCTIONS - Rotate the vehicle in all directions during calibration."
+                              TextWrapping="Wrap" Foreground="#757575"/>
+                    
+                    <ProgressBar Value="{Binding CalibrationProgress}" 
+                                Maximum="100" Height="8"
+                                IsVisible="{Binding IsCalibrating}"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
+                        <Button Classes="primary" Content="Calibrate" 
+                               Command="{Binding CalibrateCompassCommand}"
+                               IsEnabled="{Binding !IsCalibrating}"/>
+                        <Button Classes="secondary" Content="Next"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Level Horizon Tab Content -->
+            <Border Classes="card" IsVisible="{Binding SelectedTab}">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="{Binding StatusMessage}" Classes="status"/>
+                    <TextBlock Text="FOLLOW THE INSTRUCTIONS - Place the vehicle on a level surface before calibrating."
+                              TextWrapping="Wrap" Foreground="#757575"/>
+                    
+                    <ProgressBar Value="{Binding CalibrationProgress}" 
+                                Maximum="100" Height="8"
+                                IsVisible="{Binding IsCalibrating}"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
+                        <Button Classes="primary" Content="Calibrate" 
+                               Command="{Binding CalibrateLevelHorizonCommand}"
+                               IsEnabled="{Binding !IsCalibrating}"/>
+                        <Button Classes="secondary" Content="Next"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Pressure Tab Content -->
+            <Border Classes="card" IsVisible="{Binding SelectedTab}">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="{Binding StatusMessage}" Classes="status"/>
+                    <TextBlock Text="FOLLOW THE INSTRUCTIONS - Keep the vehicle still during barometer calibration."
+                              TextWrapping="Wrap" Foreground="#757575"/>
+                    
+                    <ProgressBar Value="{Binding CalibrationProgress}" 
+                                Maximum="100" Height="8"
+                                IsVisible="{Binding IsCalibrating}"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
+                        <Button Classes="primary" Content="Calibrate" 
+                               Command="{Binding CalibratePressureCommand}"
+                               IsEnabled="{Binding !IsCalibrating}"/>
+                        <Button Classes="secondary" Content="Next"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

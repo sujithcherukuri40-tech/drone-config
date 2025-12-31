@@ -8,4 +8,7 @@ public interface ITelemetryService
     event EventHandler<TelemetryData>? TelemetryUpdated;
     void Start();
     void Stop();
+    void ProcessHeartbeat(byte baseMode, uint customMode);
+    void ProcessSysStatus(ushort voltageMillivolts);
+    void ProcessGpsRawInt(int latitudeE7, int longitudeE7, byte satellitesVisible);
 }

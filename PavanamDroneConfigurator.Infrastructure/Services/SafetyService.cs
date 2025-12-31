@@ -52,11 +52,11 @@ public class SafetyService : ISafetyService
         {
             _logger.LogInformation("Updating safety settings");
 
-            await _parameterService.SetParameterAsync("BATT_LOW_VOLT", (float)settings.BatteryLowVoltage);
-            await _parameterService.SetParameterAsync("BATT_CRT_VOLT", (float)settings.BatteryCriticalVoltage);
-            await _parameterService.SetParameterAsync("RTL_ALT", (float)(settings.ReturnToLaunchAltitude * 100));
+            var lowVoltageUpdated = await _parameterService.SetParameterAsync("BATT_LOW_VOLT", (float)settings.BatteryLowVoltage);
+            var criticalVoltageUpdated = await _parameterService.SetParameterAsync("BATT_CRT_VOLT", (float)settings.BatteryCriticalVoltage);
+            var rtlAltitudeUpdated = await _parameterService.SetParameterAsync("RTL_ALT", (float)(settings.ReturnToLaunchAltitude * 100));
 
-            return true;
+            return lowVoltageUpdated && criticalVoltageUpdated && rtlAltitudeUpdated;
         }
         catch (Exception ex)
         {

@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PavanamDroneConfigurator.UI.ViewModels"
+             x:Class="PavanamDroneConfigurator.UI.Views.ParametersPage"
+             x:DataType="vm:ParametersPageViewModel">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <StackPanel Grid.Row="0" Margin="20,20,20,10" Spacing="10">
+            <TextBlock Text="Parameters" FontSize="24" FontWeight="Bold" />
+            <Button Content="Load Parameters" Command="{Binding LoadParametersCommand}" />
+            <TextBlock Text="{Binding StatusMessage}" />
+        </StackPanel>
+
+        <DataGrid Grid.Row="1" ItemsSource="{Binding Parameters}" SelectedItem="{Binding SelectedParameter}" 
+                  AutoGenerateColumns="False" Margin="20,0">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*" />
+                <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="2*" />
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Button Grid.Row="2" Content="Save Selected Parameter" Command="{Binding SaveParameterCommand}" 
+                Margin="20" HorizontalAlignment="Left" />
+    </Grid>
+</UserControl>

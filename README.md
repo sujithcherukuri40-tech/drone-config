@@ -1,0 +1,102 @@
+# Pavanam Drone Configurator
+
+A Windows-only Avalonia-based drone configurator application with Clean Architecture layout.
+
+## Project Structure
+
+- **PavanamDroneConfigurator.Core** - Domain layer with interfaces and models (no dependencies)
+- **PavanamDroneConfigurator.Infrastructure** - Implementation layer with service implementations
+- **PavanamDroneConfigurator.UI** - Avalonia UI layer with MVVM pattern using CommunityToolkit.Mvvm
+
+## Requirements
+
+- .NET 9.0 SDK
+- Windows OS (Windows 10 or later)
+
+## Building the Application
+
+From the repository root, run:
+
+```bash
+dotnet build PavanamDroneConfigurator.sln
+```
+
+## Running the Application
+
+```bash
+dotnet run --project PavanamDroneConfigurator.UI/PavanamDroneConfigurator.UI.csproj
+```
+
+Or build and run the executable:
+
+```bash
+dotnet build -c Release
+cd PavanamDroneConfigurator.UI/bin/Release/net9.0-windows
+./PavanamDroneConfigurator.UI.exe
+```
+
+## Features
+
+### Core Layer
+- **Enums**: ConnectionType, CalibrationType, CalibrationState, FailsafeAction, FlightMode
+- **Models**: ConnectionSettings, TelemetryData, DroneParameter, SafetySettings, CalibrationStateModel
+- **Interfaces**: IConnectionService, ITelemetryService, IParameterService, ICalibrationService, ISafetyService, IPersistenceService
+
+### Infrastructure Layer
+- ConnectionService - Handles Serial and TCP connections
+- TelemetryService - Provides real-time telemetry data
+- ParameterService - Manages drone parameters
+- CalibrationService - Handles sensor calibration (Accelerometer, Compass, Gyroscope)
+- SafetyService - Manages safety settings (battery failsafe, geofencing, RTL)
+- PersistenceService - JSON-based profile save/load
+
+### UI Layer
+- **Connection Page** - Configure and establish drone connections (Serial/TCP)
+- **Telemetry Page** - View real-time telemetry data
+- **Parameters Page** - Read and write drone parameters
+- **Calibration Page** - Perform sensor calibrations
+- **Safety Page** - Configure safety settings
+- **Profile Page** - Save and load configuration profiles
+
+## Architecture
+
+The application follows Clean Architecture principles:
+
+1. **Core** layer contains pure contracts (interfaces, models, enums) with no external dependencies
+2. **Infrastructure** layer implements Core interfaces using external libraries
+3. **UI** layer depends only on Core interfaces, with dependency injection providing Infrastructure implementations
+
+## Dependency Injection
+
+Services are configured in `App.axaml.cs` using Microsoft.Extensions.DependencyInjection. All ViewModels receive their dependencies through constructor injection.
+
+## Technology Stack
+
+- **UI Framework**: Avalonia 11.3.10
+- **MVVM**: CommunityToolkit.Mvvm 8.2.1
+- **Dependency Injection**: Microsoft.Extensions.DependencyInjection 9.0.0
+- **Logging**: Microsoft.Extensions.Logging 9.0.0
+- **Serialization**: Newtonsoft.Json 13.0.4
+- **Target Framework**: .NET 9.0 (Windows-only)
+
+## Development Notes
+
+- The application is configured for Windows-only deployment
+- Supports multiple Windows architectures: x64, x86, ARM64
+- All async operations use proper async/await patterns
+- Services include error handling and logging
+- Current implementation includes simulated telemetry for testing without hardware
+
+## Next Steps for Production
+
+- Integrate real MAVLink protocol communication (Asv.Mavlink library)
+- Add real-time parameter validation
+- Implement advanced calibration procedures
+- Add mission planning capabilities
+- Enhance UI with charts and graphs for telemetry visualization
+- Add firmware update functionality
+- Implement log file download and analysis
+
+## License
+
+[Add your license here]

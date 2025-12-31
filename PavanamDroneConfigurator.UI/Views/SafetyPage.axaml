@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PavanamDroneConfigurator.UI.ViewModels"
+             x:Class="PavanamDroneConfigurator.UI.Views.SafetyPage"
+             x:DataType="vm:SafetyPageViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="15">
+            <TextBlock Text="Safety Settings" FontSize="24" FontWeight="Bold" />
+
+            <Button Content="Load Settings" Command="{Binding LoadSettingsCommand}" />
+            <TextBlock Text="{Binding StatusMessage}" />
+
+            <StackPanel Spacing="10" Margin="0,20,0,0">
+                <TextBlock Text="Battery Low Voltage:" />
+                <NumericUpDown Value="{Binding Settings.BatteryLowVoltage}" Increment="0.1" FormatString="F1" />
+
+                <TextBlock Text="Battery Critical Voltage:" />
+                <NumericUpDown Value="{Binding Settings.BatteryCriticalVoltage}" Increment="0.1" FormatString="F1" />
+
+                <TextBlock Text="Return To Launch Altitude (m):" />
+                <NumericUpDown Value="{Binding Settings.ReturnToLaunchAltitude}" Increment="1" FormatString="F0" />
+
+                <CheckBox Content="Geofence Enabled" IsChecked="{Binding Settings.GeofenceEnabled}" />
+
+                <TextBlock Text="Geofence Radius (m):" />
+                <NumericUpDown Value="{Binding Settings.GeofenceRadius}" Increment="10" FormatString="F0" />
+            </StackPanel>
+
+            <Button Content="Save Settings" Command="{Binding SaveSettingsCommand}" Margin="0,20,0,0" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

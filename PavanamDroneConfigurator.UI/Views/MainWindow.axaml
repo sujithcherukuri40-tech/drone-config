@@ -1,0 +1,55 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PavanamDroneConfigurator.UI.ViewModels"
+        xmlns:views="using:PavanamDroneConfigurator.UI.Views"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
+        x:Class="PavanamDroneConfigurator.UI.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Pavanam Drone Configurator"
+        Width="1200" Height="700">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid ColumnDefinitions="200,*">
+        <!-- Navigation Sidebar -->
+        <Border Grid.Column="0" Background="#2C3E50" Padding="10">
+            <StackPanel Spacing="5">
+                <Button Content="Connection" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ConnectionPage}" CommandParameter="{Binding ConnectionPage}" Click="NavButton_Click" />
+                <Button Content="Telemetry" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).TelemetryPage}" CommandParameter="{Binding TelemetryPage}" Click="NavButton_Click" />
+                <Button Content="Parameters" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ParametersPage}" CommandParameter="{Binding ParametersPage}" Click="NavButton_Click" />
+                <Button Content="Calibration" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CalibrationPage}" CommandParameter="{Binding CalibrationPage}" Click="NavButton_Click" />
+                <Button Content="Safety" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SafetyPage}" CommandParameter="{Binding SafetyPage}" Click="NavButton_Click" />
+                <Button Content="Profiles" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ProfilePage}" CommandParameter="{Binding ProfilePage}" Click="NavButton_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Content Area -->
+        <ContentControl Grid.Column="1" Content="{Binding CurrentPage}">
+            <ContentControl.DataTemplates>
+                <DataTemplate DataType="vm:ConnectionPageViewModel">
+                    <views:ConnectionPage />
+                </DataTemplate>
+                <DataTemplate DataType="vm:TelemetryPageViewModel">
+                    <views:TelemetryPage />
+                </DataTemplate>
+                <DataTemplate DataType="vm:ParametersPageViewModel">
+                    <views:ParametersPage />
+                </DataTemplate>
+                <DataTemplate DataType="vm:CalibrationPageViewModel">
+                    <views:CalibrationPage />
+                </DataTemplate>
+                <DataTemplate DataType="vm:SafetyPageViewModel">
+                    <views:SafetyPage />
+                </DataTemplate>
+                <DataTemplate DataType="vm:ProfilePageViewModel">
+                    <views:ProfilePage />
+                </DataTemplate>
+            </ContentControl.DataTemplates>
+        </ContentControl>
+    </Grid>
+
+</Window>

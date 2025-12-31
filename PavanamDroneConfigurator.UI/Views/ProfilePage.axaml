@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PavanamDroneConfigurator.UI.ViewModels"
+             x:Class="PavanamDroneConfigurator.UI.Views.ProfilePage"
+             x:DataType="vm:ProfilePageViewModel">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="20">
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,15">
+            <TextBlock Text="Profiles" FontSize="24" FontWeight="Bold" />
+            <Button Content="Refresh Profiles" Command="{Binding LoadProfilesCommand}" />
+            <TextBlock Text="{Binding StatusMessage}" />
+        </StackPanel>
+
+        <ListBox Grid.Row="1" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" Margin="0,0,0,15" />
+
+        <StackPanel Grid.Row="2" Spacing="10">
+            <TextBlock Text="New Profile Name:" />
+            <TextBox Text="{Binding NewProfileName}" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Content="Save Profile" Command="{Binding SaveProfileCommand}" />
+                <Button Content="Load Selected" Command="{Binding LoadProfileCommand}" />
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>

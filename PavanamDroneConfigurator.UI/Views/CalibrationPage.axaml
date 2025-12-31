@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PavanamDroneConfigurator.UI.ViewModels"
+             x:Class="PavanamDroneConfigurator.UI.Views.CalibrationPage"
+             x:DataType="vm:CalibrationPageViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="15">
+            <TextBlock Text="Calibration" FontSize="24" FontWeight="Bold" />
+
+            <TextBlock Text="{Binding StatusMessage}" FontSize="16" />
+
+            <StackPanel Spacing="10" Margin="0,20,0,0">
+                <Button Content="Calibrate Accelerometer" Command="{Binding CalibrateAccelerometerCommand}" />
+                <Button Content="Calibrate Compass" Command="{Binding CalibrateCompassCommand}" />
+                <Button Content="Calibrate Gyroscope" Command="{Binding CalibrateGyroscopeCommand}" />
+                <Button Content="Cancel Calibration" Command="{Binding CancelCalibrationCommand}" />
+            </StackPanel>
+
+            <Border BorderBrush="Gray" BorderThickness="1" Padding="10" Margin="0,20,0,0" 
+                    IsVisible="{Binding CurrentState, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <StackPanel Spacing="5">
+                    <TextBlock Text="{Binding CurrentState.Type, StringFormat='Type: {0}'}" />
+                    <TextBlock Text="{Binding CurrentState.State, StringFormat='State: {0}'}" />
+                    <ProgressBar Value="{Binding CurrentState.Progress}" Maximum="100" Height="20" />
+                    <TextBlock Text="{Binding CurrentState.Message}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

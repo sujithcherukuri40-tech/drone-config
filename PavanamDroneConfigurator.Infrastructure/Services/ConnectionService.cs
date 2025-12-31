@@ -3,12 +3,15 @@ using PavanamDroneConfigurator.Core.Enums;
 using PavanamDroneConfigurator.Core.Interfaces;
 using PavanamDroneConfigurator.Core.Models;
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Management;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,6 +21,8 @@ namespace PavanamDroneConfigurator.Infrastructure.Services;
 public class ConnectionService : IConnectionService, IDisposable
 {
     private readonly ILogger<ConnectionService> _logger;
+    private readonly IParameterService _parameterService;
+    private readonly object _sendLock = new();
     private SerialPort? _serialPort;
     private TcpClient? _tcpClient;
     private bool _isConnected;
@@ -26,6 +31,7 @@ public class ConnectionService : IConnectionService, IDisposable
     private Task? _serialPortWatcherTask;
     private DateTime _lastHeartbeat = DateTime.MinValue;
     private const int HeartbeatTimeoutMs = 5000;
+    private const byte GroundControlSystemId = 255;
     private const byte GroundControlComponentId = 190;
     private const int SerialPortWatcherIntervalMs = 1000;
     private const int MaxBufferBytes = 4096;
@@ -39,15 +45,22 @@ public class ConnectionService : IConnectionService, IDisposable
     private ConnectionType? _activeConnectionType;
     private string? _activeSerialPortName;
     private SerialPortInfo[] _availablePorts = Array.Empty<SerialPortInfo>();
+    private byte _targetSystemId;
+    private byte _targetComponentId;
+    private byte _packetSequence;
+    private bool _parameterDownloadStarted;
 
     public bool IsConnected => _isConnected;
 
     public event EventHandler<bool>? ConnectionStateChanged;
     public event EventHandler<IEnumerable<SerialPortInfo>>? AvailableSerialPortsChanged;
 
-    public ConnectionService(ILogger<ConnectionService> logger)
+    public ConnectionService(ILogger<ConnectionService> logger, IParameterService parameterService)
     {
         _logger = logger;
+        _parameterService = parameterService;
+        _parameterService.ParameterListRequested += OnParameterListRequested;
+        _parameterService.ParameterWriteRequested += OnParameterWriteRequested;
         _availablePorts = EnumerateSerialPorts();
         StartSerialPortWatcher();
     }
@@ -57,6 +70,7 @@ public class ConnectionService : IConnectionService, IDisposable
         try
         {
             await DisconnectAsync();
+            ResetParameterTracking();
             _logger.LogInformation("Connecting via {Type}...", settings.Type);
 
             bool transportOpened = settings.Type == ConnectionType.Tcp
@@ -226,14 +240,14 @@ public class ConnectionService : IConnectionService, IDisposable
                     _rxBuffer.RemoveRange(0, startIndex);
                 }
 
-                if (_rxBuffer.Count < 8)
-                {
-                    return;
-                }
-
                 byte stx = _rxBuffer[0];
                 if (stx == 0xFE)
                 {
+                    if (_rxBuffer.Count < 8)
+                    {
+                        return;
+                    }
+
                     byte payloadLen = _rxBuffer[1];
                     int frameLength = payloadLen + 8;
                     if (_rxBuffer.Count < frameLength)
@@ -241,15 +255,8 @@ public class ConnectionService : IConnectionService, IDisposable
                         return;
                     }
 
-                    byte systemId = _rxBuffer[3];
-                    byte componentId = _rxBuffer[4];
-                    byte messageId = _rxBuffer[5];
-
-                    if (messageId == 0)
-                    {
-                        OnHeartbeatReceived(systemId, componentId);
-                    }
-
+                    var frame = _rxBuffer.Take(frameLength).ToArray();
+                    HandleMavlinkFrame(frame);
                     _rxBuffer.RemoveRange(0, frameLength);
                 }
                 else if (stx == 0xFD)
@@ -270,15 +277,8 @@ public class ConnectionService : IConnectionService, IDisposable
                         return;
                     }
 
-                    byte systemId = _rxBuffer[5];
-                    byte componentId = _rxBuffer[6];
-                    int messageId = _rxBuffer[7] | (_rxBuffer[8] << 8) | (_rxBuffer[9] << 16);
-
-                    if (messageId == 0)
-                    {
-                        OnHeartbeatReceived(systemId, componentId);
-                    }
-
+                    var frame = _rxBuffer.Take(frameLength).ToArray();
+                    HandleMavlinkFrame(frame);
                     _rxBuffer.RemoveRange(0, frameLength);
                 }
                 else
@@ -287,6 +287,108 @@ public class ConnectionService : IConnectionService, IDisposable
                 }
             }
         }
+    }
+
+    private void HandleMavlinkFrame(ReadOnlySpan<byte> frame)
+    {
+        if (frame.IsEmpty)
+        {
+            return;
+        }
+
+        var stx = frame[0];
+        if (stx == 0xFE)
+        {
+            HandleMavlink1Frame(frame);
+        }
+        else if (stx == 0xFD)
+        {
+            HandleMavlink2Frame(frame);
+        }
+    }
+
+    private void HandleMavlink1Frame(ReadOnlySpan<byte> frame)
+    {
+        if (frame.Length < 8)
+        {
+            return;
+        }
+
+        byte payloadLen = frame[1];
+        if (frame.Length < payloadLen + 8)
+        {
+            return;
+        }
+
+        byte systemId = frame[3];
+        byte componentId = frame[4];
+        byte messageId = frame[5];
+        var payload = frame.Slice(6, payloadLen);
+
+        switch (messageId)
+        {
+            case 0:
+                OnHeartbeatReceived(systemId, componentId);
+                break;
+            case 22:
+                HandleParamValuePayload(payload);
+                break;
+        }
+    }
+
+    private void HandleMavlink2Frame(ReadOnlySpan<byte> frame)
+    {
+        if (frame.Length < 12)
+        {
+            return;
+        }
+
+        byte payloadLen = frame[1];
+        byte incompatFlags = frame[2];
+        bool hasSignature = (incompatFlags & 0x01) != 0;
+        int signatureLength = hasSignature ? 13 : 0;
+
+        if (frame.Length < payloadLen + 12 + signatureLength)
+        {
+            return;
+        }
+
+        byte systemId = frame[5];
+        byte componentId = frame[6];
+        int messageId = frame[7] | (frame[8] << 8) | (frame[9] << 16);
+        var payload = frame.Slice(10, payloadLen);
+
+        switch (messageId)
+        {
+            case 0:
+                OnHeartbeatReceived(systemId, componentId);
+                break;
+            case 22:
+                HandleParamValuePayload(payload);
+                break;
+        }
+    }
+
+    private void HandleParamValuePayload(ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < 25)
+        {
+            _logger.LogWarning("Received PARAM_VALUE with insufficient payload length: {Length}", payload.Length);
+            return;
+        }
+
+        float value = BitConverter.ToSingle(payload.Slice(0, 4).ToArray());
+        ushort paramCount = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(4, 2));
+        ushort paramIndex = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(6, 2));
+        string name = Encoding.ASCII.GetString(payload.Slice(8, 16)).TrimEnd('\0', ' ');
+
+        var parameter = new DroneParameter
+        {
+            Name = name,
+            Value = value
+        };
+
+        _parameterService.HandleParamValue(parameter, paramIndex, paramCount);
     }
 
     private int FindStartIndex()
@@ -311,6 +413,17 @@ public class ConnectionService : IConnectionService, IDisposable
         }
     }
 
+    private void StartParameterDownloadIfNeeded()
+    {
+        if (_parameterDownloadStarted)
+        {
+            return;
+        }
+
+        _parameterDownloadStarted = true;
+        _ = _parameterService.RefreshParametersAsync();
+    }
+
     private void OnHeartbeatReceived(byte systemId, byte componentId)
     {
         // Ignore invalid or GCS-originated heartbeats (Day-2 requirement: systemId > 0 and componentId must not be the GCS)
@@ -319,18 +432,22 @@ public class ConnectionService : IConnectionService, IDisposable
             return;
         }
 
+        _targetSystemId = systemId;
+        _targetComponentId = componentId;
         _lastHeartbeat = DateTime.UtcNow;
         _firstHeartbeatTcs?.TrySetResult(true);
 
-        if (_isConnected)
+        if (!_isConnected)
         {
+            _isConnected = true;
+            StartHeartbeatMonitoring();
+            StartParameterDownloadIfNeeded();
+            ConnectionStateChanged?.Invoke(this, true);
+            _logger.LogInformation("Heartbeat received from sysid {SystemId}, compid {ComponentId}. Connection established.", systemId, componentId);
             return;
         }
 
-        _isConnected = true;
-        StartHeartbeatMonitoring();
-        ConnectionStateChanged?.Invoke(this, true);
-        _logger.LogInformation("Heartbeat received from sysid {SystemId}, compid {ComponentId}. Connection established.", systemId, componentId);
+        StartParameterDownloadIfNeeded();
     }
 
     private void StartHeartbeatMonitoring()
@@ -440,6 +557,8 @@ public class ConnectionService : IConnectionService, IDisposable
             _activeConnectionType = null;
             _activeSerialPortName = null;
             _rxBuffer.Clear();
+            _parameterService.Reset();
+            ResetParameterTracking();
 
             bool wasConnected = _isConnected;
             _isConnected = false;
@@ -641,6 +760,161 @@ public class ConnectionService : IConnectionService, IDisposable
         }
 
         return true;
+    }
+
+    private void OnParameterListRequested(object? sender, EventArgs e)
+    {
+        SendParamRequestList();
+    }
+
+    private void OnParameterWriteRequested(object? sender, ParameterWriteRequest request)
+    {
+        SendParamSet(request);
+    }
+
+    private void SendParamRequestList()
+    {
+        if (!TryGetActiveStream(out var stream))
+        {
+            _logger.LogWarning("Cannot send PARAM_REQUEST_LIST - no active connection");
+            return;
+        }
+
+        var targetSystem = _targetSystemId == 0 ? (byte)1 : _targetSystemId;
+        var targetComponent = _targetComponentId == 0 ? (byte)1 : _targetComponentId;
+        Span<byte> payload = stackalloc byte[2];
+        payload[0] = targetSystem;
+        payload[1] = targetComponent;
+
+        var frame = BuildMavlink1Frame(21, payload);
+        SendFrame(stream, frame);
+    }
+
+    private void SendParamSet(ParameterWriteRequest request)
+    {
+        if (!TryGetActiveStream(out var stream))
+        {
+            _logger.LogWarning("Cannot send PARAM_SET - no active connection");
+            return;
+        }
+
+        var targetSystem = _targetSystemId == 0 ? (byte)1 : _targetSystemId;
+        var targetComponent = _targetComponentId == 0 ? (byte)1 : _targetComponentId;
+
+        var payload = new byte[23];
+        BitConverter.GetBytes(request.Value).CopyTo(payload, 0);
+        payload[4] = targetSystem;
+        payload[5] = targetComponent;
+
+        var nameBytes = Encoding.ASCII.GetBytes(request.Name);
+        for (int i = 0; i < Math.Min(16, nameBytes.Length); i++)
+        {
+            payload[6 + i] = nameBytes[i];
+        }
+
+        payload[22] = 9; // MAV_PARAM_TYPE_REAL32
+
+        var frame = BuildMavlink1Frame(23, payload);
+        SendFrame(stream, frame);
+    }
+
+    private bool TryGetActiveStream([NotNullWhen(true)] out Stream? stream)
+    {
+        stream = null;
+        if (_activeConnectionType == ConnectionType.Tcp && _tcpClient?.Connected == true)
+        {
+            stream = _tcpClient.GetStream();
+        }
+        else if (_activeConnectionType == ConnectionType.Serial && _serialPort?.IsOpen == true)
+        {
+            stream = _serialPort.BaseStream;
+        }
+
+        return stream != null;
+    }
+
+    private byte[] BuildMavlink1Frame(byte messageId, ReadOnlySpan<byte> payload)
+    {
+        var frame = new byte[payload.Length + 8];
+        frame[0] = 0xFE;
+        frame[1] = (byte)payload.Length;
+        frame[2] = _packetSequence++;
+        frame[3] = GroundControlSystemId;
+        frame[4] = GroundControlComponentId;
+        frame[5] = messageId;
+        payload.CopyTo(frame.AsSpan(6));
+
+        ushort crc = ComputeX25Crc(frame.AsSpan(1, payload.Length + 5), GetCrcExtra(messageId));
+        frame[^2] = (byte)(crc & 0xFF);
+        frame[^1] = (byte)(crc >> 8);
+        return frame;
+    }
+
+    private void SendFrame(Stream stream, ReadOnlySpan<byte> frame)
+    {
+        try
+        {
+            lock (_sendLock)
+            {
+                stream.Write(frame);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send MAVLink frame");
+        }
+    }
+
+    private static ushort ComputeX25Crc(ReadOnlySpan<byte> buffer, byte crcExtra)
+    {
+        ushort crc = 0xFFFF;
+        foreach (var b in buffer)
+        {
+            crc ^= b;
+            for (int i = 0; i < 8; i++)
+            {
+                if ((crc & 1) != 0)
+                {
+                    crc = (ushort)((crc >> 1) ^ 0xA001);
+                }
+                else
+                {
+                    crc >>= 1;
+                }
+            }
+        }
+
+        crc ^= crcExtra;
+        for (int i = 0; i < 8; i++)
+        {
+            if ((crc & 1) != 0)
+            {
+                crc = (ushort)((crc >> 1) ^ 0xA001);
+            }
+            else
+            {
+                crc >>= 1;
+            }
+        }
+
+        return crc;
+    }
+
+    private static byte GetCrcExtra(byte messageId) => messageId switch
+    {
+        0 => 50,
+        21 => 122,
+        22 => 220,
+        23 => 168,
+        _ => 0
+    };
+
+    private void ResetParameterTracking()
+    {
+        _parameterDownloadStarted = false;
+        _targetSystemId = 0;
+        _targetComponentId = 0;
+        _packetSequence = 0;
     }
 
     public void Dispose()

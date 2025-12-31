@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -14,8 +15,8 @@ namespace PavanamDroneConfigurator.UI.ViewModels;
 public partial class ConnectionPageViewModel : ViewModelBase
 {
     private readonly IConnectionService _connectionService;
-    private readonly ITelemetryService _telemetryService;
     private readonly IParameterService _parameterService;
+    private bool _downloadInProgress;
 
     [ObservableProperty]
     private ObservableCollection<SerialPortInfo> _availableSerialPorts = new();
@@ -47,20 +48,17 @@ public partial class ConnectionPageViewModel : ViewModelBase
     [ObservableProperty]
     private IBrush _connectionStatusBrush = Brushes.Red;
 
-    [ObservableProperty]
-    private TelemetryData? _currentTelemetry;
-
     public ConnectionPageViewModel(
         IConnectionService connectionService, 
-        ITelemetryService telemetryService,
         IParameterService parameterService)
     {
         _connectionService = connectionService;
-        _telemetryService = telemetryService;
         _parameterService = parameterService;
 
         _connectionService.ConnectionStateChanged += OnConnectionStateChanged;
         _connectionService.AvailableSerialPortsChanged += OnAvailableSerialPortsChanged;
+        _parameterService.ParameterDownloadProgressChanged += OnParameterDownloadProgressChanged;
+        _downloadInProgress = _parameterService.IsParameterDownloadInProgress;
 
         var ports = _connectionService.GetAvailableSerialPorts().ToList();
         AvailableSerialPorts = new ObservableCollection<SerialPortInfo>(ports);
@@ -68,11 +66,6 @@ public partial class ConnectionPageViewModel : ViewModelBase
         {
             SelectedSerialPort = ports.First();
         }
-
-        _telemetryService.TelemetryUpdated += (s, telemetry) =>
-        {
-            CurrentTelemetry = telemetry;
-        };
     }
 
     private void OnAvailableSerialPortsChanged(object? sender, IEnumerable<SerialPortInfo> ports)
@@ -103,21 +96,16 @@ public partial class ConnectionPageViewModel : ViewModelBase
 
             if (connected)
             {
-                // Start telemetry when connected
-                _telemetryService.Start();
-                
-                // Load parameters when connected
-                StatusMessage = "Connected - Loading parameters...";
-                await _parameterService.RefreshParametersAsync();
-                StatusMessage = "Connected - Parameters loaded";
+                _downloadInProgress = true;
+                StatusMessage = "Connected - Downloading parameters...";
             }
             else
             {
-                // Stop telemetry when disconnected
-                _telemetryService.Stop();
-                
-                // Clear telemetry data
-                CurrentTelemetry = null;
+                var interruptedDownload = _downloadInProgress && !_parameterService.IsParameterDownloadComplete;
+                StatusMessage = interruptedDownload
+                    ? "Disconnected during parameter download"
+                    : "Disconnected";
+                _downloadInProgress = false;
             }
         }
         catch (Exception ex)
@@ -131,6 +119,25 @@ public partial class ConnectionPageViewModel : ViewModelBase
     {
         ConnectionStatusText = text;
         ConnectionStatusBrush = brush;
+    }
+
+    private void OnParameterDownloadProgressChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            _downloadInProgress = _parameterService.IsParameterDownloadInProgress;
+            if (_parameterService.IsParameterDownloadInProgress)
+            {
+                var expected = _parameterService.ExpectedParameterCount.HasValue
+                    ? _parameterService.ExpectedParameterCount.Value.ToString()
+                    : "?";
+                StatusMessage = $"Downloading parameters... {_parameterService.ReceivedParameterCount}/{expected}";
+            }
+            else if (_parameterService.IsParameterDownloadComplete && _connectionService.IsConnected)
+            {
+                StatusMessage = "Connected - Parameters loaded";
+            }
+        });
     }
 
     [RelayCommand]

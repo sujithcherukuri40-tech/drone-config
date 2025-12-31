@@ -68,16 +68,6 @@
             </StackPanel>
 
             <TextBlock Text="{Binding StatusMessage}" FontWeight="Bold" />
-
-            <Border BorderBrush="Gray" BorderThickness="1" Padding="10" Margin="0,20,0,0" IsVisible="{Binding IsConnected}">
-                <StackPanel Spacing="5">
-                    <TextBlock Text="Telemetry" FontSize="18" FontWeight="Bold" />
-                    <TextBlock Text="{Binding CurrentTelemetry.FlightMode, StringFormat='Flight Mode: {0}'}" />
-                    <TextBlock Text="{Binding CurrentTelemetry.Armed, StringFormat='Armed: {0}'}" />
-                    <TextBlock Text="{Binding CurrentTelemetry.BatteryVoltage, StringFormat='Battery: {0:F2}V'}" />
-                    <TextBlock Text="{Binding CurrentTelemetry.SatelliteCount, StringFormat='Satellites: {0}'}" />
-                </StackPanel>
-            </Border>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

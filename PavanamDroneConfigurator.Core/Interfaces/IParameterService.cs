@@ -10,6 +10,11 @@ public interface IParameterService
     Task RefreshParametersAsync();
     event EventHandler? ParameterListRequested;
     event EventHandler<ParameterWriteRequest>? ParameterWriteRequested;
+    bool IsParameterDownloadInProgress { get; }
+    bool IsParameterDownloadComplete { get; }
+    int ReceivedParameterCount { get; }
+    int? ExpectedParameterCount { get; }
+    event EventHandler? ParameterDownloadProgressChanged;
     void HandleParamValue(DroneParameter parameter, ushort paramIndex, ushort paramCount);
     void Reset();
 }

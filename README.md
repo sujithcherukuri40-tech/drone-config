@@ -39,12 +39,11 @@ cd PavanamDroneConfigurator.UI/bin/Release/net9.0-windows
 
 ### Core Layer
 - **Enums**: ConnectionType, CalibrationType, CalibrationState, FailsafeAction, FlightMode
-- **Models**: ConnectionSettings, TelemetryData, DroneParameter, SafetySettings, CalibrationStateModel
-- **Interfaces**: IConnectionService, ITelemetryService, IParameterService, ICalibrationService, ISafetyService, IPersistenceService
+- **Models**: ConnectionSettings, DroneParameter, SafetySettings, CalibrationStateModel
+- **Interfaces**: IConnectionService, IParameterService, ICalibrationService, ISafetyService, IPersistenceService
 
 ### Infrastructure Layer
 - ConnectionService - Handles Serial and TCP connections
-- TelemetryService - Provides real-time telemetry data
 - ParameterService - Manages drone parameters
 - CalibrationService - Handles sensor calibration (Accelerometer, Compass, Gyroscope)
 - SafetyService - Manages safety settings (battery failsafe, geofencing, RTL)
@@ -52,7 +51,6 @@ cd PavanamDroneConfigurator.UI/bin/Release/net9.0-windows
 
 ### UI Layer
 - **Connection Page** - Configure and establish drone connections (Serial/TCP)
-- **Telemetry Page** - View real-time telemetry data
 - **Parameters Page** - Read and write drone parameters
 - **Calibration Page** - Perform sensor calibrations
 - **Safety Page** - Configure safety settings
@@ -85,7 +83,6 @@ Services are configured in `App.axaml.cs` using Microsoft.Extensions.DependencyI
 - Supports multiple Windows architectures: x64, x86, ARM64
 - All async operations use proper async/await patterns
 - Services include error handling and logging
-- Current implementation includes simulated telemetry for testing without hardware
 
 ## Next Steps for Production
 

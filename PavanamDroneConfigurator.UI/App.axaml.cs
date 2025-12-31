@@ -36,7 +36,6 @@ public partial class App : Application
 
         // Core services
         services.AddSingleton<IConnectionService, ConnectionService>();
-        services.AddSingleton<ITelemetryService, TelemetryService>();
         services.AddSingleton<IParameterService, ParameterService>();
         services.AddSingleton<ICalibrationService, CalibrationService>();
         services.AddSingleton<ISafetyService, SafetyService>();
@@ -45,7 +44,6 @@ public partial class App : Application
         // ViewModels
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<ConnectionPageViewModel>();
-        services.AddTransient<TelemetryPageViewModel>();
         services.AddTransient<ParametersPageViewModel>();
         services.AddTransient<CalibrationPageViewModel>();
         services.AddTransient<SafetyPageViewModel>();

@@ -12,10 +12,15 @@ public class ParameterService : IParameterService
     private readonly object _sync = new();
     private TaskCompletionSource<bool>? _parameterListCompletion;
     private readonly TimeSpan _operationTimeout = TimeSpan.FromSeconds(5);
+    private readonly TimeSpan _parameterDownloadTimeout = TimeSpan.FromSeconds(60);
     private ushort? _expectedParamCount;
+    private bool _isParameterDownloadInProgress;
+    private bool _isParameterDownloadComplete;
+    private int _receivedParameterCount;
 
     public event EventHandler? ParameterListRequested;
     public event EventHandler<ParameterWriteRequest>? ParameterWriteRequested;
+    public event EventHandler? ParameterDownloadProgressChanged;
 
     public ParameterService(ILogger<ParameterService> logger)
     {
@@ -28,6 +33,50 @@ public class ParameterService : IParameterService
         lock (_sync)
         {
             return Task.FromResult(_parameters.Values.ToList());
+        }
+    }
+
+    public bool IsParameterDownloadInProgress
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _isParameterDownloadInProgress;
+            }
+        }
+    }
+
+    public bool IsParameterDownloadComplete
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _isParameterDownloadComplete;
+            }
+        }
+    }
+
+    public int ReceivedParameterCount
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _receivedParameterCount;
+            }
+        }
+    }
+
+    public int? ExpectedParameterCount
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _expectedParamCount.HasValue ? (int?)_expectedParamCount.Value : null;
+            }
         }
     }
 
@@ -87,16 +136,34 @@ public class ParameterService : IParameterService
         if (ParameterListRequested == null)
         {
             _logger.LogWarning("No MAVLink transport subscribed to parameter list requests; skipping refresh");
+            lock (_sync)
+            {
+                _isParameterDownloadInProgress = false;
+                _isParameterDownloadComplete = false;
+                _receivedParameterCount = 0;
+                _expectedParamCount = null;
+            }
+            ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
 
         TaskCompletionSource<bool>? listCompletion;
+        bool raiseProgressEvent;
         lock (_sync)
         {
             _parameters.Clear();
             _expectedParamCount = null;
             _parameterListCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             listCompletion = _parameterListCompletion;
+            _isParameterDownloadInProgress = true;
+            _isParameterDownloadComplete = false;
+            _receivedParameterCount = 0;
+            raiseProgressEvent = true;
+        }
+
+        if (raiseProgressEvent)
+        {
+            ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
         }
 
         ParameterListRequested?.Invoke(this, EventArgs.Empty);
@@ -106,10 +173,20 @@ public class ParameterService : IParameterService
             return;
         }
 
-        var completed = await Task.WhenAny(listCompletion.Task, Task.Delay(_operationTimeout));
+        var completed = await Task.WhenAny(listCompletion.Task, Task.Delay(_parameterDownloadTimeout));
         if (completed != listCompletion.Task)
         {
             _logger.LogWarning("Parameter list request timed out before completion");
+            lock (_sync)
+            {
+                _parameters.Clear();
+                _expectedParamCount = null;
+                _receivedParameterCount = 0;
+                _isParameterDownloadInProgress = false;
+                _isParameterDownloadComplete = false;
+                _parameterListCompletion = null;
+            }
+            ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -117,10 +194,12 @@ public class ParameterService : IParameterService
     {
         TaskCompletionSource<DroneParameter>? pendingWrite = null;
         TaskCompletionSource<bool>? listCompletion = null;
+        bool raiseProgress = false;
 
         lock (_sync)
         {
             _parameters[parameter.Name] = parameter;
+            _receivedParameterCount = _parameters.Count;
 
             if (!_expectedParamCount.HasValue)
             {
@@ -145,18 +224,26 @@ public class ParameterService : IParameterService
                 {
                     listCompletion = _parameterListCompletion;
                     _parameterListCompletion = null;
+                    _isParameterDownloadInProgress = false;
+                    _isParameterDownloadComplete = true;
                 }
             }
+            raiseProgress = true;
         }
 
         pendingWrite?.TrySetResult(parameter);
         listCompletion?.TrySetResult(true);
+        if (raiseProgress)
+        {
+            ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     public void Reset()
     {
         TaskCompletionSource<bool>? listCompletion;
         List<TaskCompletionSource<DroneParameter>> pendingWrites;
+        bool raiseProgress = false;
 
         lock (_sync)
         {
@@ -166,12 +253,21 @@ public class ParameterService : IParameterService
             _pendingParamWrites.Clear();
             _parameters.Clear();
             _expectedParamCount = null;
+            _receivedParameterCount = 0;
+            _isParameterDownloadInProgress = false;
+            _isParameterDownloadComplete = false;
+            raiseProgress = true;
         }
 
         listCompletion?.TrySetCanceled();
         foreach (var pending in pendingWrites)
         {
             pending.TrySetCanceled();
+        }
+
+        if (raiseProgress)
+        {
+            ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }

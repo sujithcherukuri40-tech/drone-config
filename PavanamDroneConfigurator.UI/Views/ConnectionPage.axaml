@@ -11,6 +11,11 @@
         <StackPanel Margin="20" Spacing="15">
             <TextBlock Text="Connection Settings" FontSize="24" FontWeight="Bold" />
 
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <Ellipse Width="14" Height="14" Fill="{Binding ConnectionStatusBrush}" Stroke="Black" StrokeThickness="1"/>
+                <TextBlock Text="{Binding ConnectionStatusText}" FontSize="16" FontWeight="Bold" />
+            </StackPanel>
+
             <StackPanel Spacing="10">
                 <TextBlock Text="Connection Type:" />
                 <ComboBox SelectedIndex="{Binding ConnectionType}" IsEnabled="{Binding !IsConnected}">
@@ -25,7 +30,9 @@
                     <TextBlock Text="Serial Connection Settings" FontWeight="Bold" />
                     <StackPanel Spacing="5">
                         <TextBlock Text="Port Name:" />
-                        <TextBox Text="{Binding SelectedPortName}" IsEnabled="{Binding !IsConnected}" />
+                        <ComboBox ItemsSource="{Binding AvailableSerialPorts}"
+                                  SelectedItem="{Binding SelectedPortName}"
+                                  IsEnabled="{Binding !IsConnected}" />
                     </StackPanel>
                     <StackPanel Spacing="5">
                         <TextBlock Text="Baud Rate:" />

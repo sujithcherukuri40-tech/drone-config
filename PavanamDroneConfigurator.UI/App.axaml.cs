@@ -63,6 +63,7 @@ public partial class App : Application
             {
                 DataContext = Services!.GetRequiredService<MainWindowViewModel>(),
             };
+            desktop.Exit += (_, _) => Services?.Dispose();
         }
 
         base.OnFrameworkInitializationCompleted();

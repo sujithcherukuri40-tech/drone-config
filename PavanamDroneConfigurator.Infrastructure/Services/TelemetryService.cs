@@ -8,8 +8,8 @@ public class TelemetryService : ITelemetryService
 {
     private readonly ILogger<TelemetryService> _logger;
     private readonly TelemetryData _currentTelemetry = new();
-    private System.Timers.Timer? _updateTimer;
     private bool _isRunning;
+    private readonly object _sync = new();
 
     public TelemetryData? CurrentTelemetry => _currentTelemetry;
 
@@ -27,7 +27,6 @@ public class TelemetryService : ITelemetryService
 
         _logger.LogInformation("Starting telemetry service");
         _isRunning = true;
-        StartSimulatedTelemetry();
     }
 
     public void Stop()
@@ -37,32 +36,47 @@ public class TelemetryService : ITelemetryService
 
         _logger.LogInformation("Stopping telemetry service");
         _isRunning = false;
-        
-        if (_updateTimer != null)
+    }
+
+    public void ProcessHeartbeat(byte baseMode, uint customMode)
+    {
+        if (!_isRunning)
+            return;
+
+        lock (_sync)
         {
-            _updateTimer.Stop();
-            _updateTimer.Dispose();
-            _updateTimer = null;
+            _currentTelemetry.Armed = (baseMode & 0x80) != 0;
+            _currentTelemetry.FlightMode = customMode.ToString();
+            _currentTelemetry.Timestamp = DateTime.UtcNow;
+            TelemetryUpdated?.Invoke(this, _currentTelemetry);
         }
     }
 
-    private void StartSimulatedTelemetry()
+    public void ProcessSysStatus(ushort voltageMillivolts)
     {
-        _updateTimer = new System.Timers.Timer(1000);
-        _updateTimer.Elapsed += (s, e) =>
+        if (!_isRunning)
+            return;
+
+        lock (_sync)
         {
-            if (!_isRunning)
-                return;
-
-            // Simulate telemetry updates
-            _currentTelemetry.Timestamp = DateTime.Now;
-            _currentTelemetry.BatteryVoltage = 12.4 + Random.Shared.NextDouble() * 0.2;
-            _currentTelemetry.BatteryRemaining = 75;
-            _currentTelemetry.SatelliteCount = 12;
-            _currentTelemetry.FlightMode = "Stabilize";
-
+            _currentTelemetry.BatteryVoltage = voltageMillivolts / 1000.0;
+            _currentTelemetry.Timestamp = DateTime.UtcNow;
             TelemetryUpdated?.Invoke(this, _currentTelemetry);
-        };
-        _updateTimer.Start();
+        }
+    }
+
+    public void ProcessGpsRawInt(int latitudeE7, int longitudeE7, byte satellitesVisible)
+    {
+        if (!_isRunning)
+            return;
+
+        lock (_sync)
+        {
+            _currentTelemetry.Latitude = latitudeE7 / 1e7;
+            _currentTelemetry.Longitude = longitudeE7 / 1e7;
+            _currentTelemetry.SatelliteCount = satellitesVisible;
+            _currentTelemetry.Timestamp = DateTime.UtcNow;
+            TelemetryUpdated?.Invoke(this, _currentTelemetry);
+        }
     }
 }

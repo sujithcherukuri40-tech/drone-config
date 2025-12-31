@@ -104,8 +104,10 @@ public partial class ParametersPageViewModel : ViewModelBase
 
         if (SelectedParameter != null)
         {
-            await _parameterService.SetParameterAsync(SelectedParameter.Name, SelectedParameter.Value);
-            StatusMessage = $"Saved {SelectedParameter.Name} = {SelectedParameter.Value}";
+            var updated = await _parameterService.SetParameterAsync(SelectedParameter.Name, SelectedParameter.Value);
+            StatusMessage = updated
+                ? $"Saved {SelectedParameter.Name} = {SelectedParameter.Value}"
+                : $"Failed to save {SelectedParameter.Name}";
         }
     }
 }

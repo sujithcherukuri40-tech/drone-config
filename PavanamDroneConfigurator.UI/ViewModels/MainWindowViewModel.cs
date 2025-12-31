@@ -23,7 +23,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private int? _parameterDownloadExpected;
 
     [ObservableProperty]
-    private string _parameterDownloadStatusText = "Downloading parameters from vehicle…";
+    private string _parameterDownloadStatusText = "Downloading parameters from vehicle...";
 
     [ObservableProperty]
     private bool _canAccessParameters;

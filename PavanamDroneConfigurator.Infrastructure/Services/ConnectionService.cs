@@ -377,7 +377,7 @@ public class ConnectionService : IConnectionService, IDisposable
             return;
         }
 
-        float value = BitConverter.ToSingle(payload.Slice(0, 4).ToArray());
+        float value = BinaryPrimitives.ReadSingleLittleEndian(payload);
         ushort paramCount = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(4, 2));
         ushort paramIndex = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(6, 2));
         string name = Encoding.ASCII.GetString(payload.Slice(8, 16)).TrimEnd('\0', ' ');

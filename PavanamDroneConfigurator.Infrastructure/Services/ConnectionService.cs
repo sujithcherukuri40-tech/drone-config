@@ -33,6 +33,7 @@ public class ConnectionService : IConnectionService, IDisposable
     private const int HeartbeatTimeoutMs = 5000;
     private const byte GroundControlSystemId = 255;
     private const byte GroundControlComponentId = 190;
+    private const byte MavParamTypeReal32 = 9;
     private const int SerialPortWatcherIntervalMs = 1000;
     private const int MaxBufferBytes = 4096;
     private static readonly Regex ComPortRegex = new(@"\((COM\d+)\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -371,16 +372,28 @@ public class ConnectionService : IConnectionService, IDisposable
 
     private void HandleParamValuePayload(ReadOnlySpan<byte> payload)
     {
-        if (payload.Length < 25)
+        const int paramCountOffset = 4;
+        const int paramIndexOffset = 6;
+        const int paramIdOffset = 8;
+        const int paramIdLength = 16;
+        const int paramTypeOffset = paramIdOffset + paramIdLength;
+
+        if (payload.Length < paramTypeOffset + 1)
         {
             _logger.LogWarning("Received PARAM_VALUE with insufficient payload length: {Length}", payload.Length);
             return;
         }
 
         float value = BinaryPrimitives.ReadSingleLittleEndian(payload);
-        ushort paramCount = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(4, 2));
-        ushort paramIndex = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(6, 2));
-        string name = Encoding.ASCII.GetString(payload.Slice(8, 16)).TrimEnd('\0', ' ');
+        ushort paramCount = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(paramCountOffset, 2));
+        ushort paramIndex = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(paramIndexOffset, 2));
+        string name = Encoding.ASCII.GetString(payload.Slice(paramIdOffset, paramIdLength)).TrimEnd('\0', ' ');
+        byte paramType = payload[paramTypeOffset];
+
+        if (paramType != MavParamTypeReal32)
+        {
+            _logger.LogDebug("Received PARAM_VALUE {Name} with param_type {ParamType}", name, paramType);
+        }
 
         var parameter = new DroneParameter
         {
@@ -812,7 +825,7 @@ public class ConnectionService : IConnectionService, IDisposable
             payload[6 + i] = nameBytes[i];
         }
 
-        payload[22] = 9; // MAV_PARAM_TYPE_REAL32
+        payload[22] = MavParamTypeReal32; // MAV_PARAM_TYPE_REAL32
 
         var frame = BuildMavlink1Frame(23, payload);
         SendFrame(stream, frame);

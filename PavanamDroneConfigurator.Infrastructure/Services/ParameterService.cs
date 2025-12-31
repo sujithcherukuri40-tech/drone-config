@@ -173,8 +173,14 @@ public class ParameterService : IParameterService
             return;
         }
 
-        var completed = await Task.WhenAny(listCompletion.Task, Task.Delay(_parameterDownloadTimeout));
-        if (completed != listCompletion.Task)
+        using var downloadTimeoutCts = new CancellationTokenSource();
+        var timeoutTask = Task.Delay(_parameterDownloadTimeout, downloadTimeoutCts.Token);
+        var completed = await Task.WhenAny(listCompletion.Task, timeoutTask);
+        if (completed == listCompletion.Task)
+        {
+            downloadTimeoutCts.Cancel();
+        }
+        else
         {
             _logger.LogWarning("Parameter list request timed out before completion");
             lock (_sync)

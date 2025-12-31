@@ -40,6 +40,8 @@ public class ConnectionService : IConnectionService, IDisposable
     private const byte CrcExtraParamRequestList = 122;
     private const byte CrcExtraParamValue = 220;
     private const byte CrcExtraParamSet = 168;
+    private const ushort X25InitialCrc = 0xFFFF;
+    private const ushort X25Polynomial = 0xA001;
     private const int SerialPortWatcherIntervalMs = 1000;
     private const int MaxBufferBytes = 4096;
     private static readonly Regex ComPortRegex = new(@"\((COM\d+)\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -56,6 +58,8 @@ public class ConnectionService : IConnectionService, IDisposable
     private byte _targetComponentId;
     private byte _packetSequence;
     private bool _parameterDownloadStarted;
+    private Task? _parameterDownloadTask;
+    private readonly object _parameterDownloadLock = new();
 
     public bool IsConnected => _isConnected;
 
@@ -434,13 +438,29 @@ public class ConnectionService : IConnectionService, IDisposable
 
     private void StartParameterDownloadIfNeeded()
     {
-        if (_parameterDownloadStarted)
+        lock (_parameterDownloadLock)
         {
-            return;
+            if (_parameterDownloadStarted)
+            {
+                return;
+            }
+
+            _parameterDownloadStarted = true;
         }
 
-        _parameterDownloadStarted = true;
-        _ = _parameterService.RefreshParametersAsync();
+        _parameterDownloadTask = StartParameterDownloadAsync();
+    }
+
+    private async Task StartParameterDownloadAsync()
+    {
+        try
+        {
+            await _parameterService.RefreshParametersAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start parameter download");
+        }
     }
 
     private void OnHeartbeatReceived(byte systemId, byte componentId)
@@ -886,7 +906,7 @@ public class ConnectionService : IConnectionService, IDisposable
 
     private static ushort ComputeX25Crc(ReadOnlySpan<byte> buffer, byte crcExtra)
     {
-        ushort crc = 0xFFFF;
+        ushort crc = X25InitialCrc;
         foreach (var b in buffer)
         {
             crc ^= b;
@@ -894,7 +914,7 @@ public class ConnectionService : IConnectionService, IDisposable
             {
                 if ((crc & 1) != 0)
                 {
-                    crc = (ushort)((crc >> 1) ^ 0xA001);
+                    crc = (ushort)((crc >> 1) ^ X25Polynomial);
                 }
                 else
                 {
@@ -908,7 +928,7 @@ public class ConnectionService : IConnectionService, IDisposable
         {
             if ((crc & 1) != 0)
             {
-                crc = (ushort)((crc >> 1) ^ 0xA001);
+                crc = (ushort)((crc >> 1) ^ X25Polynomial);
             }
             else
             {
@@ -934,6 +954,7 @@ public class ConnectionService : IConnectionService, IDisposable
         _targetSystemId = 0;
         _targetComponentId = 0;
         _packetSequence = 0;
+        _parameterDownloadTask = null;
     }
 
     public void Dispose()

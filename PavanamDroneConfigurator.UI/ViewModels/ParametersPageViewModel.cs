@@ -37,18 +37,26 @@ public partial class ParametersPageViewModel : ViewModelBase
 
     private async void OnConnectionStateChanged(object? sender, bool connected)
     {
-        CanEditParameters = connected;
-        
-        if (connected)
+        try
         {
-            // Auto-load parameters when connected
-            await LoadParametersAsync();
+            CanEditParameters = connected;
+            
+            if (connected)
+            {
+                // Auto-load parameters when connected
+                await LoadParametersAsync();
+            }
+            else
+            {
+                // Clear parameters when disconnected
+                Parameters.Clear();
+                StatusMessage = "Disconnected - Parameters cleared";
+            }
         }
-        else
+        catch (Exception ex)
         {
-            // Clear parameters when disconnected
-            Parameters.Clear();
-            StatusMessage = "Disconnected - Parameters cleared";
+            StatusMessage = $"Error handling connection state: {ex.Message}";
+            // In production, this should be logged via ILogger
         }
     }
 

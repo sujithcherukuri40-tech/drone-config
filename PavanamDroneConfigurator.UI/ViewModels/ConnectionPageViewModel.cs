@@ -55,26 +55,34 @@ public partial class ConnectionPageViewModel : ViewModelBase
 
     private async void OnConnectionStateChanged(object? sender, bool connected)
     {
-        IsConnected = connected;
-        StatusMessage = connected ? "Connected" : "Disconnected";
+        try
+        {
+            IsConnected = connected;
+            StatusMessage = connected ? "Connected" : "Disconnected";
 
-        if (connected)
-        {
-            // Start telemetry when connected
-            _telemetryService.Start();
-            
-            // Load parameters when connected
-            StatusMessage = "Connected - Loading parameters...";
-            await _parameterService.RefreshParametersAsync();
-            StatusMessage = "Connected - Parameters loaded";
+            if (connected)
+            {
+                // Start telemetry when connected
+                _telemetryService.Start();
+                
+                // Load parameters when connected
+                StatusMessage = "Connected - Loading parameters...";
+                await _parameterService.RefreshParametersAsync();
+                StatusMessage = "Connected - Parameters loaded";
+            }
+            else
+            {
+                // Stop telemetry when disconnected
+                _telemetryService.Stop();
+                
+                // Clear telemetry data
+                CurrentTelemetry = null;
+            }
         }
-        else
+        catch (Exception ex)
         {
-            // Stop telemetry when disconnected
-            _telemetryService.Stop();
-            
-            // Clear telemetry data
-            CurrentTelemetry = null;
+            StatusMessage = $"Error during connection state change: {ex.Message}";
+            // In production, this should be logged via ILogger
         }
     }
 

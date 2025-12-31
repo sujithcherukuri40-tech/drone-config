@@ -112,17 +112,26 @@ public class ConnectionService : IConnectionService
     private void StartHeartbeatMonitoring()
     {
         _heartbeatTimer = new System.Timers.Timer(1000); // Check every second
-        _heartbeatTimer.Elapsed += (s, e) =>
+        _heartbeatTimer.Elapsed += async (s, e) =>
         {
             var timeSinceLastHeartbeat = DateTime.Now - _lastHeartbeat;
             if (timeSinceLastHeartbeat.TotalMilliseconds > HeartbeatTimeoutMs)
             {
                 _logger.LogWarning("Heartbeat timeout detected. Auto-disconnecting...");
-                _ = DisconnectAsync();
+                try
+                {
+                    await DisconnectAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error during auto-disconnect");
+                }
             }
             else
             {
-                // Simulate heartbeat for now
+                // TODO: In production, remove this simulation
+                // Heartbeat should be updated by incoming MAVLink HEARTBEAT messages
+                // For now, we simulate a healthy connection to prevent auto-disconnect during development/testing
                 _lastHeartbeat = DateTime.Now;
             }
         };

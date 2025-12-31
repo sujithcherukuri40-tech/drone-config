@@ -10,6 +10,7 @@ public partial class ConnectionPageViewModel : ViewModelBase
 {
     private readonly IConnectionService _connectionService;
     private readonly ITelemetryService _telemetryService;
+    private readonly IParameterService _parameterService;
 
     [ObservableProperty]
     private string _selectedPortName = "COM3";
@@ -35,21 +36,46 @@ public partial class ConnectionPageViewModel : ViewModelBase
     [ObservableProperty]
     private TelemetryData? _currentTelemetry;
 
-    public ConnectionPageViewModel(IConnectionService connectionService, ITelemetryService telemetryService)
+    public ConnectionPageViewModel(
+        IConnectionService connectionService, 
+        ITelemetryService telemetryService,
+        IParameterService parameterService)
     {
         _connectionService = connectionService;
         _telemetryService = telemetryService;
+        _parameterService = parameterService;
 
-        _connectionService.ConnectionStateChanged += (s, connected) =>
-        {
-            IsConnected = connected;
-            StatusMessage = connected ? "Connected" : "Disconnected";
-        };
+        _connectionService.ConnectionStateChanged += OnConnectionStateChanged;
 
         _telemetryService.TelemetryUpdated += (s, telemetry) =>
         {
             CurrentTelemetry = telemetry;
         };
+    }
+
+    private async void OnConnectionStateChanged(object? sender, bool connected)
+    {
+        IsConnected = connected;
+        StatusMessage = connected ? "Connected" : "Disconnected";
+
+        if (connected)
+        {
+            // Start telemetry when connected
+            _telemetryService.Start();
+            
+            // Load parameters when connected
+            StatusMessage = "Connected - Loading parameters...";
+            await _parameterService.RefreshParametersAsync();
+            StatusMessage = "Connected - Parameters loaded";
+        }
+        else
+        {
+            // Stop telemetry when disconnected
+            _telemetryService.Stop();
+            
+            // Clear telemetry data
+            CurrentTelemetry = null;
+        }
     }
 
     [RelayCommand]
@@ -64,12 +90,19 @@ public partial class ConnectionPageViewModel : ViewModelBase
             Port = TcpPort
         };
 
-        await _connectionService.ConnectAsync(settings);
+        StatusMessage = "Connecting...";
+        var result = await _connectionService.ConnectAsync(settings);
+        
+        if (!result)
+        {
+            StatusMessage = "Connection failed";
+        }
     }
 
     [RelayCommand]
     private async Task DisconnectAsync()
     {
+        StatusMessage = "Disconnecting...";
         await _connectionService.DisconnectAsync();
     }
 }

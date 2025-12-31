@@ -9,6 +9,7 @@ namespace PavanamDroneConfigurator.UI.ViewModels;
 public partial class ParametersPageViewModel : ViewModelBase
 {
     private readonly IParameterService _parameterService;
+    private readonly IConnectionService _connectionService;
 
     [ObservableProperty]
     private ObservableCollection<DroneParameter> _parameters = new();
@@ -19,14 +20,47 @@ public partial class ParametersPageViewModel : ViewModelBase
     [ObservableProperty]
     private string _statusMessage = string.Empty;
 
-    public ParametersPageViewModel(IParameterService parameterService)
+    [ObservableProperty]
+    private bool _canEditParameters;
+
+    public ParametersPageViewModel(IParameterService parameterService, IConnectionService connectionService)
     {
         _parameterService = parameterService;
+        _connectionService = connectionService;
+
+        // Subscribe to connection state changes
+        _connectionService.ConnectionStateChanged += OnConnectionStateChanged;
+        
+        // Initialize can edit state
+        CanEditParameters = _connectionService.IsConnected;
+    }
+
+    private async void OnConnectionStateChanged(object? sender, bool connected)
+    {
+        CanEditParameters = connected;
+        
+        if (connected)
+        {
+            // Auto-load parameters when connected
+            await LoadParametersAsync();
+        }
+        else
+        {
+            // Clear parameters when disconnected
+            Parameters.Clear();
+            StatusMessage = "Disconnected - Parameters cleared";
+        }
     }
 
     [RelayCommand]
     private async Task LoadParametersAsync()
     {
+        if (!_connectionService.IsConnected)
+        {
+            StatusMessage = "Not connected. Please connect first.";
+            return;
+        }
+
         StatusMessage = "Loading parameters...";
         var parameters = await _parameterService.GetAllParametersAsync();
         Parameters.Clear();
@@ -38,12 +72,32 @@ public partial class ParametersPageViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task RefreshParametersAsync()
+    {
+        if (!_connectionService.IsConnected)
+        {
+            StatusMessage = "Not connected. Please connect first.";
+            return;
+        }
+
+        StatusMessage = "Refreshing parameters...";
+        await _parameterService.RefreshParametersAsync();
+        await LoadParametersAsync();
+    }
+
+    [RelayCommand]
     private async Task SaveParameterAsync()
     {
+        if (!_connectionService.IsConnected)
+        {
+            StatusMessage = "Not connected. Cannot save parameter.";
+            return;
+        }
+
         if (SelectedParameter != null)
         {
             await _parameterService.SetParameterAsync(SelectedParameter.Name, SelectedParameter.Value);
-            StatusMessage = $"Saved {SelectedParameter.Name}";
+            StatusMessage = $"Saved {SelectedParameter.Name} = {SelectedParameter.Value}";
         }
     }
 }

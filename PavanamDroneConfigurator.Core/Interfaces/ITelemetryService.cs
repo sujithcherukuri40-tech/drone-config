@@ -6,4 +6,6 @@ public interface ITelemetryService
 {
     TelemetryData? CurrentTelemetry { get; }
     event EventHandler<TelemetryData>? TelemetryUpdated;
+    void Start();
+    void Stop();
 }

@@ -7,7 +7,12 @@
     <Grid RowDefinitions="Auto,*,Auto">
         <StackPanel Grid.Row="0" Margin="20,20,20,10" Spacing="10">
             <TextBlock Text="Parameters" FontSize="24" FontWeight="Bold" />
-            <Button Content="Load Parameters" Command="{Binding LoadParametersCommand}" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Content="Load Parameters" Command="{Binding LoadParametersCommand}" 
+                        IsEnabled="{Binding CanEditParameters}" />
+                <Button Content="Refresh Parameters" Command="{Binding RefreshParametersCommand}" 
+                        IsEnabled="{Binding CanEditParameters}" />
+            </StackPanel>
             <TextBlock Text="{Binding StatusMessage}" />
         </StackPanel>
 
@@ -21,6 +26,6 @@
         </DataGrid>
 
         <Button Grid.Row="2" Content="Save Selected Parameter" Command="{Binding SaveParameterCommand}" 
-                Margin="20" HorizontalAlignment="Left" />
+                Margin="20" HorizontalAlignment="Left" IsEnabled="{Binding CanEditParameters}" />
     </Grid>
 </UserControl>

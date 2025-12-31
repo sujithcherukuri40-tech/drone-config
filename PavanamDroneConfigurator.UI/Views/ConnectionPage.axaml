@@ -31,8 +31,14 @@
                     <StackPanel Spacing="5">
                         <TextBlock Text="Port Name:" />
                         <ComboBox ItemsSource="{Binding AvailableSerialPorts}"
-                                  SelectedItem="{Binding SelectedPortName}"
-                                  IsEnabled="{Binding !IsConnected}" />
+                                  SelectedItem="{Binding SelectedSerialPort}"
+                                  IsEnabled="{Binding !IsConnected}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                     </StackPanel>
                     <StackPanel Spacing="5">
                         <TextBlock Text="Baud Rate:" />

@@ -18,10 +18,10 @@ public partial class ConnectionPageViewModel : ViewModelBase
     private readonly IParameterService _parameterService;
 
     [ObservableProperty]
-    private ObservableCollection<string> _availableSerialPorts = new();
+    private ObservableCollection<SerialPortInfo> _availableSerialPorts = new();
 
     [ObservableProperty]
-    private string _selectedPortName = "COM3";
+    private SerialPortInfo? _selectedSerialPort;
 
     [ObservableProperty]
     private int _baudRate = 115200;
@@ -63,10 +63,10 @@ public partial class ConnectionPageViewModel : ViewModelBase
         _connectionService.AvailableSerialPortsChanged += OnAvailableSerialPortsChanged;
 
         var ports = _connectionService.GetAvailableSerialPorts().ToList();
-        AvailableSerialPorts = new ObservableCollection<string>(ports);
+        AvailableSerialPorts = new ObservableCollection<SerialPortInfo>(ports);
         if (ports.Any())
         {
-            SelectedPortName = ports.First();
+            SelectedSerialPort = ports.First();
         }
 
         _telemetryService.TelemetryUpdated += (s, telemetry) =>
@@ -75,7 +75,7 @@ public partial class ConnectionPageViewModel : ViewModelBase
         };
     }
 
-    private void OnAvailableSerialPortsChanged(object? sender, IEnumerable<string> ports)
+    private void OnAvailableSerialPortsChanged(object? sender, IEnumerable<SerialPortInfo> ports)
     {
         Dispatcher.UIThread.Post(() =>
         {
@@ -85,9 +85,10 @@ public partial class ConnectionPageViewModel : ViewModelBase
                 AvailableSerialPorts.Add(port);
             }
 
-            if (AvailableSerialPorts.Any() && (string.IsNullOrEmpty(SelectedPortName) || !AvailableSerialPorts.Contains(SelectedPortName)))
+            var selectedPortName = SelectedSerialPort?.PortName;
+            if (AvailableSerialPorts.Any() && (selectedPortName == null || !AvailableSerialPorts.Any(p => p.PortName == selectedPortName)))
             {
-                SelectedPortName = AvailableSerialPorts.First();
+                SelectedSerialPort = AvailableSerialPorts.First();
             }
         });
     }
@@ -138,7 +139,7 @@ public partial class ConnectionPageViewModel : ViewModelBase
         var settings = new ConnectionSettings
         {
             Type = ConnectionType,
-            PortName = SelectedPortName,
+            PortName = SelectedSerialPort?.PortName ?? string.Empty,
             BaudRate = BaudRate,
             IpAddress = IpAddress,
             Port = TcpPort

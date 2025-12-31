@@ -2,11 +2,14 @@ using Microsoft.Extensions.Logging;
 using PavanamDroneConfigurator.Core.Enums;
 using PavanamDroneConfigurator.Core.Interfaces;
 using PavanamDroneConfigurator.Core.Models;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Ports;
 using System.Linq;
+using System.Management;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -26,6 +29,7 @@ public class ConnectionService : IConnectionService, IDisposable
     private const byte GroundControlComponentId = 190;
     private const int SerialPortWatcherIntervalMs = 1000;
     private const int MaxBufferBytes = 4096;
+    private static readonly Regex ComPortRegex = new(@"\((COM\d+)\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private CancellationTokenSource? _receiveCts;
     private Task? _receiveTask;
     private TaskCompletionSource<bool>? _firstHeartbeatTcs;
@@ -34,17 +38,17 @@ public class ConnectionService : IConnectionService, IDisposable
     private readonly SemaphoreSlim _disconnectLock = new(1, 1);
     private ConnectionType? _activeConnectionType;
     private string? _activeSerialPortName;
-    private string[] _availablePorts = Array.Empty<string>();
+    private SerialPortInfo[] _availablePorts = Array.Empty<SerialPortInfo>();
 
     public bool IsConnected => _isConnected;
 
     public event EventHandler<bool>? ConnectionStateChanged;
-    public event EventHandler<IEnumerable<string>>? AvailableSerialPortsChanged;
+    public event EventHandler<IEnumerable<SerialPortInfo>>? AvailableSerialPortsChanged;
 
     public ConnectionService(ILogger<ConnectionService> logger)
     {
         _logger = logger;
-        _availablePorts = SerialPort.GetPortNames().OrderBy(p => p).ToArray();
+        _availablePorts = EnumerateSerialPorts();
         StartSerialPortWatcher();
     }
 
@@ -452,7 +456,7 @@ public class ConnectionService : IConnectionService, IDisposable
         }
     }
 
-    public IEnumerable<string> GetAvailableSerialPorts() => _availablePorts;
+    public IEnumerable<SerialPortInfo> GetAvailableSerialPorts() => _availablePorts;
 
     private void StartSerialPortWatcher()
     {
@@ -501,18 +505,142 @@ public class ConnectionService : IConnectionService, IDisposable
 
     private async Task UpdateSerialPortsAsync()
     {
-        var ports = SerialPort.GetPortNames().OrderBy(p => p).ToArray();
-        if (!_availablePorts.SequenceEqual(ports))
+        var ports = EnumerateSerialPorts();
+        if (!PortsEqual(_availablePorts, ports))
         {
             _availablePorts = ports;
             AvailableSerialPortsChanged?.Invoke(this, _availablePorts);
         }
 
-        if (_serialPort != null && _serialPort.IsOpen && _activeSerialPortName != null && !_availablePorts.Contains(_activeSerialPortName))
+        if (_serialPort != null &&
+            _serialPort.IsOpen &&
+            _activeSerialPortName != null &&
+            !_availablePorts.Any(p => string.Equals(p.PortName, _activeSerialPortName, StringComparison.OrdinalIgnoreCase)))
         {
             _logger.LogWarning("Active serial port {Port} disappeared. Disconnecting.", _activeSerialPortName);
             await DisconnectAsync().ConfigureAwait(false);
         }
+    }
+
+    private SerialPortInfo[] EnumerateSerialPorts()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return SerialPort.GetPortNames()
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .Select(port => new SerialPortInfo
+                {
+                    PortName = port,
+                    FriendlyName = port,
+                    InterfaceType = "Serial"
+                })
+                .ToArray();
+        }
+
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_PnPEntity WHERE Name LIKE '%(COM%)'");
+            var ports = new List<SerialPortInfo>();
+            foreach (var portObject in searcher.Get())
+            {
+                var name = portObject["Name"]?.ToString();
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                var portName = ExtractPortName(name);
+                if (string.IsNullOrWhiteSpace(portName))
+                {
+                    continue;
+                }
+
+                ports.Add(new SerialPortInfo
+                {
+                    PortName = portName,
+                    FriendlyName = ExtractFriendlyName(name, portName),
+                    InterfaceType = DetectInterfaceType(name)
+                });
+            }
+
+            if (ports.Count == 0)
+            {
+                return SerialPort.GetPortNames()
+                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                    .Select(port => new SerialPortInfo
+                    {
+                        PortName = port,
+                        FriendlyName = port,
+                        InterfaceType = "Serial"
+                    })
+                    .ToArray();
+            }
+
+            return ports
+                .OrderBy(p => p.PortName, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enumerate serial ports via WMI. Falling back to SerialPort.GetPortNames.");
+            return SerialPort.GetPortNames()
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .Select(port => new SerialPortInfo
+                {
+                    PortName = port,
+                    FriendlyName = port,
+                    InterfaceType = "Serial"
+                })
+                .ToArray();
+        }
+    }
+
+    private static string ExtractPortName(string deviceName)
+    {
+        var match = ComPortRegex.Match(deviceName);
+        return match.Success ? match.Groups[1].Value.ToUpperInvariant() : string.Empty;
+    }
+
+    private static string ExtractFriendlyName(string deviceName, string portName)
+    {
+        var portToken = $"({portName})";
+        var friendly = deviceName.Replace(portToken, string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
+        return string.IsNullOrWhiteSpace(friendly) ? deviceName : friendly;
+    }
+
+    private static string DetectInterfaceType(string name)
+    {
+        if (name.Contains("SLCAN", StringComparison.OrdinalIgnoreCase))
+        {
+            return "SLCAN";
+        }
+
+        if (name.Contains("Cube", StringComparison.OrdinalIgnoreCase) || name.Contains("PX4", StringComparison.OrdinalIgnoreCase))
+        {
+            return "MAVLink";
+        }
+
+        return "Serial";
+    }
+
+    private static bool PortsEqual(IReadOnlyList<SerialPortInfo> existing, IReadOnlyList<SerialPortInfo> updated)
+    {
+        if (existing.Count != updated.Count)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < existing.Count; i++)
+        {
+            if (!string.Equals(existing[i].PortName, updated[i].PortName, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(existing[i].FriendlyName, updated[i].FriendlyName, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(existing[i].InterfaceType, updated[i].InterfaceType, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public void Dispose()

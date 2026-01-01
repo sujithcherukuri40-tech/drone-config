@@ -41,23 +41,28 @@ public partial class AirframePageViewModel : ViewModelBase
     private readonly IConnectionService _connectionService;
     private bool _isSyncingFromParameters;
     private int? _lastFrameTypeValue;
+    // Small tolerance used when interpreting cached float parameters as integral values.
+    // MAVLink param values are floats; float.Epsilon is too small once values grow, so a 1e-4 window
+    // guards against minor transport rounding while still treating parameters as integers.
+    private const float ParameterEqualityTolerance = 0.0001f;
 
     private static readonly IReadOnlyList<FrameClassOption> FrameClassCatalog = new List<FrameClassOption>
     {
-        new(0, "Quad"),
-        new(1, "Hexa"),
-        new(2, "Octa"),
-        new(3, "OctaQuad"),
-        new(4, "Y6"),
-        new(5, "Heli"),
-        new(6, "Tri"),
-        new(7, "SingleCopter"),
-        new(8, "CoaxCopter"),
-        new(9, "Twin"),
-        new(10, "Heli Dual"),
-        new(11, "DodecaHexa"),
-        new(12, "Y4"),
-        new(13, "Deca"),
+        new(0, "Plane"),
+        new(1, "Quad"),
+        new(2, "Hexa"),
+        new(3, "Octa"),
+        new(4, "OctaQuad"),
+        new(5, "Y6"),
+        new(6, "Heli"),
+        new(7, "Tri"),
+        new(8, "SingleCopter"),
+        new(9, "CoaxCopter"),
+        new(10, "Twin"),
+        new(11, "Heli Dual"),
+        new(12, "DodecaHexa"),
+        new(13, "Y4"),
+        new(14, "Deca"),
     };
 
     private static readonly IReadOnlyList<FrameTypeOption> FrameTypeCatalog = new List<FrameTypeOption>
@@ -92,7 +97,15 @@ public partial class AirframePageViewModel : ViewModelBase
 
     public bool IsInteractionEnabled => IsPageEnabled && !IsApplying;
     public bool IsFrameTypeEnabled => IsInteractionEnabled && FrameTypes.Count > 0;
-    public bool CanUpdate => IsInteractionEnabled && SelectedFrameClass != null && (!FrameTypes.Any() || SelectedFrameType != null);
+    // Frame type is only required when we know the vehicle already has a frame type value
+    // (from cache) or the operator picked one explicitly. This allows overwriting even if the
+    // parameter was missing while still demanding an explicit type when one exists.
+    private bool FrameTypeSelectionIsRequired()
+    {
+        return FrameTypes.Count > 0 && (_lastFrameTypeValue.HasValue || SelectedFrameType != null);
+    }
+
+    public bool CanUpdate => CanExecuteUpdate();
 
     public AirframePageViewModel(IParameterService parameterService, IConnectionService connectionService)
     {
@@ -176,11 +189,17 @@ public partial class AirframePageViewModel : ViewModelBase
             return;
         }
 
+        var frameClassResult = false;
+        var frameClassAttempted = false;
+        var frameTypeResult = false;
+        var frameTypeAttempted = false;
+
         try
         {
             IsApplying = true;
             StatusMessage = $"Writing FRAME_CLASS = {SelectedFrameClass.Value}...";
-            var frameClassResult = await _parameterService.SetParameterAsync("FRAME_CLASS", SelectedFrameClass.Value);
+            frameClassAttempted = true;
+            frameClassResult = await _parameterService.SetParameterAsync("FRAME_CLASS", SelectedFrameClass.Value);
 
             if (!frameClassResult)
             {
@@ -188,20 +207,29 @@ public partial class AirframePageViewModel : ViewModelBase
                 return;
             }
 
-            var frameTypeResult = true;
             if (SelectedFrameType != null)
             {
                 StatusMessage = $"FRAME_CLASS confirmed. Writing FRAME_TYPE = {SelectedFrameType.Value}...";
+                frameTypeAttempted = true;
                 frameTypeResult = await _parameterService.SetParameterAsync("FRAME_TYPE", SelectedFrameType.Value);
             }
 
-            if (frameClassResult && frameTypeResult)
+            var frameTypeConfirmed = !frameTypeAttempted || frameTypeResult;
+
+            if (frameClassResult && frameTypeConfirmed)
             {
+                if (SelectedFrameType != null)
+                {
+                    _lastFrameTypeValue = SelectedFrameType.Value;
+                }
+                OnPropertyChanged(nameof(CanUpdate));
                 StatusMessage = "Frame parameters updated after confirmation.";
             }
             else
             {
-                StatusMessage = "FRAME_TYPE was not confirmed. Frame update incomplete.";
+                StatusMessage = frameTypeAttempted
+                    ? "FRAME_TYPE was not confirmed. Frame update incomplete."
+                    : "FRAME_CLASS was not confirmed. Frame update incomplete.";
             }
         }
         catch (Exception ex)
@@ -211,7 +239,13 @@ public partial class AirframePageViewModel : ViewModelBase
         finally
         {
             IsApplying = false;
-            await SyncFromParametersAsync(forceStatusUpdate: true);
+            // Re-sync from the parameter cache only when a write was attempted and any write failed,
+            // so the UI reflects the last confirmed values instead of optimistic selections.
+            if (HasAttemptedWrites(frameClassAttempted, frameTypeAttempted) &&
+                HasFailedWrites(frameClassResult, frameTypeAttempted, frameTypeResult))
+            {
+                await SyncFromParametersAsync(forceStatusUpdate: true);
+            }
         }
     }
 
@@ -302,13 +336,16 @@ public partial class AirframePageViewModel : ViewModelBase
     private void BuildFrameTypeOptions(int? currentTypeValue)
     {
         var options = new List<FrameTypeOption>(FrameTypeCatalog);
+        EnsureFrameTypeOption(currentTypeValue, options);
 
-        if (currentTypeValue.HasValue && options.All(o => o.Value != currentTypeValue.Value))
+        FrameTypes.Clear();
+        foreach (var option in options)
         {
-            options.Add(new FrameTypeOption(currentTypeValue.Value, $"Unknown ({currentTypeValue.Value})"));
+            FrameTypes.Add(option);
         }
 
-        FrameTypes = new ObservableCollection<FrameTypeOption>(options);
+        OnPropertyChanged(nameof(IsFrameTypeEnabled));
+        OnPropertyChanged(nameof(CanUpdate));
     }
 
     private FrameClassOption? EnsureFrameClassOption(int? frameClassValue)
@@ -329,6 +366,43 @@ public partial class AirframePageViewModel : ViewModelBase
         return option;
     }
 
+    private FrameTypeOption? EnsureFrameTypeOption(int? frameTypeValue, List<FrameTypeOption> options)
+    {
+        if (!frameTypeValue.HasValue)
+        {
+            return null;
+        }
+
+        var existing = options.FirstOrDefault(t => t.Value == frameTypeValue.Value);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        var option = new FrameTypeOption(frameTypeValue.Value, $"Unknown ({frameTypeValue.Value})");
+        options.Add(option);
+        return option;
+    }
+
+    private bool CanExecuteUpdate()
+    {
+        // Interaction must be enabled, a frame class chosen, and if a frame type is required
+        // (known from cache or explicitly picked) it must also be selected.
+        return IsInteractionEnabled &&
+               SelectedFrameClass != null &&
+               (!FrameTypeSelectionIsRequired() || SelectedFrameType != null);
+    }
+
+    private static bool HasAttemptedWrites(bool frameClassAttempted, bool frameTypeAttempted)
+    {
+        return frameClassAttempted || frameTypeAttempted;
+    }
+
+    private static bool HasFailedWrites(bool frameClassResult, bool frameTypeAttempted, bool frameTypeResult)
+    {
+        return !frameClassResult || (frameTypeAttempted && !frameTypeResult);
+    }
+
     private static int? TryParseParameterValue(DroneParameter? parameter)
     {
         if (parameter == null)
@@ -336,7 +410,7 @@ public partial class AirframePageViewModel : ViewModelBase
             return null;
         }
 
-        var parsed = (int)parameter.Value;
-        return Math.Abs(parameter.Value - parsed) < float.Epsilon ? parsed : null;
+        var parsed = (int)Math.Round(parameter.Value, MidpointRounding.AwayFromZero);
+        return Math.Abs(parameter.Value - parsed) < ParameterEqualityTolerance ? parsed : null;
     }
 }

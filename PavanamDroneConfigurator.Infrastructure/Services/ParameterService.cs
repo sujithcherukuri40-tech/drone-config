@@ -319,6 +319,9 @@ public class ParameterService : IParameterService
         }
     }
 
+    /// <summary>
+    /// Ensures the download completion notification is raised only once per download lifecycle.
+    /// </summary>
     private bool TryMarkDownloadCompleted()
     {
         if (_parameterDownloadCompletionRaised)
@@ -481,7 +484,7 @@ public class ParameterService : IParameterService
             pending.TrySetCanceled();
         }
 
-        // Reset can interrupt an in-progress download; surface completion so listeners can close progress UI.
+        // Reset can interrupt an in-progress download; notify listeners that the download has ended.
         if (raiseCompletedEvent)
         {
             ParameterDownloadCompleted?.Invoke(this, false);

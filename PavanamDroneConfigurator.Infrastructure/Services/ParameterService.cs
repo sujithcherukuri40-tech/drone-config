@@ -239,6 +239,10 @@ public class ParameterService : IParameterService
                 _expectedParamCount = paramCount;
                 _missingParamIndices.Clear();
                 _missingParamIndices.UnionWith(Enumerable.Range(0, paramCount));
+                foreach (var receivedIndex in _receivedParamIndices)
+                {
+                    _missingParamIndices.Remove(receivedIndex);
+                }
             }
             else if (_expectedParamCount.HasValue && paramCount > 0 && _expectedParamCount.Value != paramCount)
             {
@@ -269,7 +273,7 @@ public class ParameterService : IParameterService
             }
 
             if (_parameterListCompletion != null && _expectedParamCount.HasValue &&
-                _receivedParameterCount == _expectedParamCount.Value)
+                _receivedParameterCount >= _expectedParamCount.Value)
             {
                 listCompletion = _parameterListCompletion;
                 _parameterListCompletion = null;
@@ -301,59 +305,77 @@ public class ParameterService : IParameterService
                 await Task.Delay(_paramValueIdleTimeout, token);
 
                 List<ushort>? missingIndices = null;
-                bool triggerRetry = false;
-                bool triggerFailure = false;
+                bool completeDownload = false;
+                bool raiseProgress = false;
+                bool stopMonitor = false;
+                bool skipProcessing = false;
 
                 lock (_sync)
                 {
-                    if (!_isParameterDownloadInProgress ||
-                        !_expectedParamCount.HasValue ||
-                        _missingParamIndices.Count == 0)
+                    if (!_isParameterDownloadInProgress)
                     {
-                        continue;
-                    }
-
-                    if (_lastParamValueReceived != DateTime.MinValue &&
-                        DateTime.UtcNow - _lastParamValueReceived < _paramValueIdleTimeout)
-                    {
-                        continue;
-                    }
-
-                    missingIndices = new List<ushort>(_missingParamIndices.Count);
-                    foreach (var index in _missingParamIndices)
-                    {
-                        missingIndices.Add((ushort)index);
-                    }
-
-                    if (_retryAttempts >= _maxParameterRetries)
-                    {
-                        triggerFailure = true;
-                        _isParameterDownloadInProgress = false;
-                        _isParameterDownloadComplete = false;
-                        _parameterListCompletion?.TrySetResult(false);
-                        _parameterListCompletion = null;
+                        skipProcessing = true;
                     }
                     else
                     {
-                        _retryAttempts++;
-                        triggerRetry = true;
+                        var now = DateTime.UtcNow;
+                        var timeSinceLastParam = now - _lastParamValueReceived;
+                        var hasExpectedCount = _expectedParamCount.HasValue;
+
+                        if (hasExpectedCount && _receivedParameterCount >= _expectedParamCount.Value)
+                        {
+                            completeDownload = true;
+                        }
+                        else if (timeSinceLastParam >= _paramValueIdleTimeout)
+                        {
+                            completeDownload = true;
+                        }
+                        else if (hasExpectedCount && _missingParamIndices.Count > 0)
+                        {
+                            if (_retryAttempts < _maxParameterRetries)
+                            {
+                                missingIndices = new List<ushort>(_missingParamIndices.Count);
+                                foreach (var index in _missingParamIndices)
+                                {
+                                    missingIndices.Add((ushort)index);
+                                }
+                                _retryAttempts++;
+                            }
+                        }
+
+                        if (completeDownload)
+                        {
+                            _isParameterDownloadInProgress = false;
+                            _isParameterDownloadComplete = true;
+                            _parameterListCompletion?.TrySetResult(true);
+                            _parameterListCompletion = null;
+                            stopMonitor = true;
+                        }
+
+                        raiseProgress = completeDownload || missingIndices != null;
                     }
                 }
 
-                if (triggerFailure)
+                if (skipProcessing)
                 {
-                    StopParameterMonitoring();
-                    ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
-                    break;
+                    continue;
                 }
 
-                if (triggerRetry)
+                if (missingIndices != null)
                 {
                     foreach (var missingIndex in missingIndices)
                     {
                         ParameterReadRequested?.Invoke(this, new ParameterReadRequest(missingIndex));
                     }
+                }
 
+                if (completeDownload && stopMonitor)
+                {
+                    StopParameterMonitoring();
+                }
+
+                if (raiseProgress)
+                {
                     ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
                 }
             }

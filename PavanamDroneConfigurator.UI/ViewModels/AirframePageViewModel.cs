@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using PavanamDroneConfigurator.Core.Interfaces;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace PavanamDroneConfigurator.UI.ViewModels;
@@ -30,6 +31,7 @@ public partial class AirframePageViewModel : ViewModelBase
 {
     private readonly IParameterService _parameterService;
     private readonly IConnectionService _connectionService;
+    private bool _isSyncingSelectionFromParams;
     private bool _showingApplyResult;
 
     [ObservableProperty]
@@ -65,6 +67,11 @@ public partial class AirframePageViewModel : ViewModelBase
     partial void OnSelectedAirframeChanged(AirframeOption? value)
     {
         OnPropertyChanged(nameof(CanApply));
+        if (_isSyncingSelectionFromParams)
+        {
+            return;
+        }
+
         if (value != null && IsPageEnabled && !IsApplying)
         {
             _showingApplyResult = false;
@@ -110,6 +117,13 @@ public partial class AirframePageViewModel : ViewModelBase
             StatusMessage = $"Applying {SelectedAirframe.Name}...";
 
             var frameClassResult = await _parameterService.SetParameterAsync("FRAME_CLASS", SelectedAirframe.FrameClass);
+            if (!frameClassResult)
+            {
+                StatusMessage = $"Failed to apply {SelectedAirframe.Name}.";
+                _showingApplyResult = true;
+                return;
+            }
+
             var frameTypeResult = true;
             if (SelectedAirframe.FrameType.HasValue)
             {
@@ -185,17 +199,93 @@ public partial class AirframePageViewModel : ViewModelBase
             return;
         }
 
-        if (!IsApplying)
+        if (!IsApplying && !_showingApplyResult)
         {
-            if (_showingApplyResult)
+            _ = SyncAirframeFromParametersAsync(forceStatusUpdate: true);
+        }
+    }
+
+    private async Task SyncAirframeFromParametersAsync(bool forceStatusUpdate = false)
+    {
+        if (!_connectionService.IsConnected || !_parameterService.IsParameterDownloadComplete || IsApplying)
+        {
+            return;
+        }
+
+        var frameClassParam = await _parameterService.GetParameterAsync("FRAME_CLASS");
+        var frameTypeParam = await _parameterService.GetParameterAsync("FRAME_TYPE");
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (_showingApplyResult && !forceStatusUpdate)
             {
                 return;
             }
 
-            StatusMessage = SelectedAirframe != null
-                ? $"Ready to apply {SelectedAirframe.Name}"
-                : "Select an airframe and click Apply.";
-            _showingApplyResult = false;
-        }
+            if (frameClassParam == null)
+            {
+                if (!IsApplying)
+                {
+                    StatusMessage = "Waiting for FRAME_CLASS parameter...";
+                }
+                if (SelectedAirframe != null)
+                {
+                    _isSyncingSelectionFromParams = true;
+                    SelectedAirframe = null;
+                    _isSyncingSelectionFromParams = false;
+                }
+                return;
+            }
+
+            var frameClassValue = (int)frameClassParam.Value;
+            var frameTypeValue = frameTypeParam != null ? (int?)frameTypeParam.Value : null;
+            var candidates = Airframes.Where(a => a.FrameClass == frameClassValue).ToList();
+
+            AirframeOption? match = null;
+            if (candidates.Count == 1 && !candidates[0].FrameType.HasValue)
+            {
+                match = candidates[0];
+            }
+            else if (frameTypeValue.HasValue)
+            {
+                match = candidates.FirstOrDefault(a =>
+                    a.FrameType.HasValue && a.FrameType.Value == frameTypeValue.Value);
+            }
+            else if (candidates.All(a => !a.FrameType.HasValue) && candidates.Count > 0)
+            {
+                match = candidates.First();
+            }
+
+            if (match != null)
+            {
+                if (!ReferenceEquals(SelectedAirframe, match))
+                {
+                    _isSyncingSelectionFromParams = true;
+                    SelectedAirframe = match;
+                    _isSyncingSelectionFromParams = false;
+                }
+
+                if (!IsApplying)
+                {
+                    StatusMessage = $"Current airframe: {match.Name}";
+                }
+            }
+            else
+            {
+                if (SelectedAirframe != null)
+                {
+                    _isSyncingSelectionFromParams = true;
+                    SelectedAirframe = null;
+                    _isSyncingSelectionFromParams = false;
+                }
+
+                if (!IsApplying)
+                {
+                    StatusMessage = frameTypeValue.HasValue
+                        ? "Current parameters don't match a known airframe."
+                        : "Waiting for FRAME_TYPE parameter...";
+                }
+            }
+        });
     }
 }

@@ -3,7 +3,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PavanamDroneConfigurator.Core.Interfaces;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace PavanamDroneConfigurator.UI.ViewModels;
@@ -30,6 +32,7 @@ public partial class AirframePageViewModel : ViewModelBase
 {
     private readonly IParameterService _parameterService;
     private readonly IConnectionService _connectionService;
+    private bool _isSyncingSelectionFromParams;
     private bool _showingApplyResult;
 
     [ObservableProperty]
@@ -65,6 +68,11 @@ public partial class AirframePageViewModel : ViewModelBase
     partial void OnSelectedAirframeChanged(AirframeOption? value)
     {
         OnPropertyChanged(nameof(CanApply));
+        if (_isSyncingSelectionFromParams)
+        {
+            return;
+        }
+
         if (value != null && IsPageEnabled && !IsApplying)
         {
             _showingApplyResult = false;
@@ -111,7 +119,11 @@ public partial class AirframePageViewModel : ViewModelBase
 
             var frameClassResult = await _parameterService.SetParameterAsync("FRAME_CLASS", SelectedAirframe.FrameClass);
             var frameTypeResult = true;
-            if (SelectedAirframe.FrameType.HasValue)
+            if (!frameClassResult)
+            {
+                frameTypeResult = false;
+            }
+            else if (SelectedAirframe.FrameType.HasValue)
             {
                 frameTypeResult = await _parameterService.SetParameterAsync("FRAME_TYPE", SelectedAirframe.FrameType.Value);
             }
@@ -185,17 +197,159 @@ public partial class AirframePageViewModel : ViewModelBase
             return;
         }
 
-        if (!IsApplying)
+        if (!IsApplying && !_showingApplyResult)
         {
-            if (_showingApplyResult)
+            _ = SyncAirframeFromParametersAsync(forceStatusUpdate: true);
+        }
+    }
+
+    private async Task SyncAirframeFromParametersAsync(bool forceStatusUpdate = false)
+    {
+        if (!_connectionService.IsConnected || !_parameterService.IsParameterDownloadComplete || IsApplying)
+        {
+            return;
+        }
+
+        var frameClassParam = await _parameterService.GetParameterAsync("FRAME_CLASS");
+        var frameTypeParam = await _parameterService.GetParameterAsync("FRAME_TYPE");
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (_showingApplyResult && !forceStatusUpdate)
             {
                 return;
             }
 
-            StatusMessage = SelectedAirframe != null
-                ? $"Ready to apply {SelectedAirframe.Name}"
-                : "Select an airframe and click Apply.";
-            _showingApplyResult = false;
+            if (frameClassParam == null)
+            {
+                if (!IsApplying)
+                {
+                    StatusMessage = "Waiting for FRAME_CLASS parameter...";
+                }
+                if (SelectedAirframe != null)
+                {
+                    SetSelectedAirframeFromSync(null);
+                }
+                return;
+            }
+
+            if (!TryParseParameterValue(frameClassParam.Value, out var frameClassValue))
+            {
+                if (!IsApplying)
+                {
+                    StatusMessage = "FRAME_CLASS parameter is not numeric.";
+                }
+                if (SelectedAirframe != null)
+                {
+                    SetSelectedAirframeFromSync(null);
+                }
+                return;
+            }
+
+            int? frameTypeValue = null;
+            if (frameTypeParam != null)
+            {
+                if (TryParseParameterValue(frameTypeParam.Value, out var parsedFrameType))
+                {
+                    frameTypeValue = parsedFrameType;
+                }
+                else
+                {
+                    if (!IsApplying)
+                    {
+                        StatusMessage = "FRAME_TYPE parameter is not numeric.";
+                    }
+                    if (SelectedAirframe != null)
+                    {
+                        SetSelectedAirframeFromSync(null);
+                    }
+                    return;
+                }
+            }
+
+            var candidates = Airframes.Where(a => a.FrameClass == frameClassValue);
+
+            var match = FindMatchingAirframe(candidates, frameTypeValue);
+
+            if (match != null)
+            {
+                var selectionMatches = SelectedAirframe != null &&
+                                       SelectedAirframe.FrameClass == match.FrameClass &&
+                                       SelectedAirframe.FrameType == match.FrameType &&
+                                       SelectedAirframe.Name == match.Name;
+
+                if (!selectionMatches)
+                {
+                    SetSelectedAirframeFromSync(match);
+                }
+
+                if (!IsApplying)
+                {
+                    StatusMessage = $"Current airframe: {match.Name}";
+                }
+            }
+            else
+            {
+                if (SelectedAirframe != null)
+                {
+                    SetSelectedAirframeFromSync(null);
+                }
+
+                if (!IsApplying)
+                {
+                    StatusMessage = frameTypeValue.HasValue
+                        ? "Current parameters don't match a known airframe."
+                        : "Waiting for FRAME_TYPE parameter...";
+                }
+            }
+        });
+    }
+
+    private void SetSelectedAirframeFromSync(AirframeOption? airframe)
+    {
+        _isSyncingSelectionFromParams = true;
+        SelectedAirframe = airframe;
+        _isSyncingSelectionFromParams = false;
+    }
+
+    private static bool TryParseParameterValue(float value, out int parsed)
+    {
+        parsed = (int)value;
+        return Math.Abs(value - parsed) < float.Epsilon;
+    }
+
+    private static AirframeOption? FindMatchingAirframe(IEnumerable<AirframeOption> candidates, int? frameTypeValue)
+    {
+        var filtered = candidates as IList<AirframeOption> ?? candidates.ToArray();
+        if (filtered.Count == 0)
+        {
+            return null;
         }
+
+        if (frameTypeValue.HasValue)
+        {
+            var typedMatch = filtered.FirstOrDefault(a => a.FrameType == frameTypeValue);
+            if (typedMatch != null)
+            {
+                return typedMatch;
+            }
+        }
+
+        var hasFrameTypeValues = filtered.Any(a => a.FrameType.HasValue);
+        if (!frameTypeValue.HasValue && !hasFrameTypeValues)
+        {
+            return filtered.First();
+        }
+
+        if (filtered.Count == 1)
+        {
+            var single = filtered[0];
+            if (!single.FrameType.HasValue)
+            {
+                return single;
+            }
+        }
+
+        return null;
     }
 }

@@ -29,6 +29,7 @@ public class ParameterService : IParameterService
     public event EventHandler? ParameterListRequested;
     public event EventHandler<ParameterWriteRequest>? ParameterWriteRequested;
     public event EventHandler<ParameterReadRequest>? ParameterReadRequested;
+    public event EventHandler<string>? ParameterUpdated;
     public event EventHandler? ParameterDownloadProgressChanged;
 
     public ParameterService(ILogger<ParameterService> logger)
@@ -167,7 +168,6 @@ public class ParameterService : IParameterService
         var monitorCts = new CancellationTokenSource();
         lock (_sync)
         {
-            _parameters.Clear();
             _receivedParamIndices.Clear();
             _missingParamIndices.Clear();
             _expectedParamCount = null;
@@ -207,7 +207,6 @@ public class ParameterService : IParameterService
             _logger.LogWarning("Parameter list request timed out before completion");
             lock (_sync)
             {
-                _parameters.Clear();
                 _receivedParamIndices.Clear();
                 _missingParamIndices.Clear();
                 _expectedParamCount = null;
@@ -229,10 +228,11 @@ public class ParameterService : IParameterService
         TaskCompletionSource<bool>? listCompletion = null;
         bool raiseProgress = false;
         bool stopMonitor = false;
+        var parameterName = parameter.Name;
 
         lock (_sync)
         {
-            _parameters[parameter.Name] = parameter;
+            _parameters[parameterName] = parameter;
 
             if (!_expectedParamCount.HasValue && paramCount > 0)
             {
@@ -290,6 +290,7 @@ public class ParameterService : IParameterService
         {
             StopParameterMonitoring();
         }
+        ParameterUpdated?.Invoke(this, parameterName);
         if (raiseProgress)
         {
             ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);

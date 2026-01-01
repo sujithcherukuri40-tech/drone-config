@@ -9,17 +9,26 @@ public class ParameterService : IParameterService
     private readonly ILogger<ParameterService> _logger;
     private readonly Dictionary<string, DroneParameter> _parameters = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, TaskCompletionSource<DroneParameter>> _pendingParamWrites = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<int> _receivedParamIndices = new();
+    private readonly HashSet<int> _missingParamIndices = new();
     private readonly object _sync = new();
     private TaskCompletionSource<bool>? _parameterListCompletion;
     private readonly TimeSpan _operationTimeout = TimeSpan.FromSeconds(5);
     private readonly TimeSpan _parameterDownloadTimeout = TimeSpan.FromSeconds(60);
+    private readonly TimeSpan _paramValueIdleTimeout = TimeSpan.FromSeconds(3);
+    private const int _maxParameterRetries = 3;
+    private CancellationTokenSource? _parameterDownloadCts;
+    private Task? _parameterDownloadMonitorTask;
     private ushort? _expectedParamCount;
     private bool _isParameterDownloadInProgress;
     private bool _isParameterDownloadComplete;
     private int _receivedParameterCount;
+    private int _retryAttempts;
+    private DateTime _lastParamValueReceived = DateTime.MinValue;
 
     public event EventHandler? ParameterListRequested;
     public event EventHandler<ParameterWriteRequest>? ParameterWriteRequested;
+    public event EventHandler<ParameterReadRequest>? ParameterReadRequested;
     public event EventHandler? ParameterDownloadProgressChanged;
 
     public ParameterService(ILogger<ParameterService> logger)
@@ -138,26 +147,39 @@ public class ParameterService : IParameterService
             _logger.LogWarning("No MAVLink transport subscribed to parameter list requests; skipping refresh");
             lock (_sync)
             {
+                _receivedParamIndices.Clear();
+                _missingParamIndices.Clear();
                 _isParameterDownloadInProgress = false;
                 _isParameterDownloadComplete = false;
                 _receivedParameterCount = 0;
                 _expectedParamCount = null;
+                _retryAttempts = 0;
+                _lastParamValueReceived = DateTime.MinValue;
             }
+            StopParameterMonitoring();
             ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
 
         TaskCompletionSource<bool>? listCompletion;
         bool raiseProgressEvent;
+        StopParameterMonitoring();
+        var monitorCts = new CancellationTokenSource();
         lock (_sync)
         {
             _parameters.Clear();
+            _receivedParamIndices.Clear();
+            _missingParamIndices.Clear();
             _expectedParamCount = null;
             _parameterListCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             listCompletion = _parameterListCompletion;
             _isParameterDownloadInProgress = true;
             _isParameterDownloadComplete = false;
             _receivedParameterCount = 0;
+            _retryAttempts = 0;
+            _lastParamValueReceived = DateTime.UtcNow;
+            _parameterDownloadCts = monitorCts;
+            _parameterDownloadMonitorTask = MonitorParameterDownloadAsync(monitorCts.Token);
             raiseProgressEvent = true;
         }
 
@@ -186,12 +208,17 @@ public class ParameterService : IParameterService
             lock (_sync)
             {
                 _parameters.Clear();
+                _receivedParamIndices.Clear();
+                _missingParamIndices.Clear();
                 _expectedParamCount = null;
                 _receivedParameterCount = 0;
                 _isParameterDownloadInProgress = false;
                 _isParameterDownloadComplete = false;
+                _retryAttempts = 0;
+                _lastParamValueReceived = DateTime.MinValue;
                 _parameterListCompletion = null;
             }
+            StopParameterMonitoring();
             ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -201,47 +228,156 @@ public class ParameterService : IParameterService
         TaskCompletionSource<DroneParameter>? pendingWrite = null;
         TaskCompletionSource<bool>? listCompletion = null;
         bool raiseProgress = false;
+        bool stopMonitor = false;
 
         lock (_sync)
         {
             _parameters[parameter.Name] = parameter;
-            _receivedParameterCount = _parameters.Count;
 
-            if (!_expectedParamCount.HasValue)
+            if (!_expectedParamCount.HasValue && paramCount > 0)
             {
                 _expectedParamCount = paramCount;
+                _missingParamIndices.Clear();
+                _missingParamIndices.UnionWith(Enumerable.Range(0, paramCount));
             }
-            else if (_expectedParamCount != paramCount)
+            else if (_expectedParamCount.HasValue && paramCount > 0 && _expectedParamCount.Value != paramCount)
             {
                 _logger.LogWarning("Parameter count changed from {Expected} to {Actual}", _expectedParamCount, paramCount);
-                _expectedParamCount = paramCount;
+                // Preserve the first advertised (>0) count to avoid oscillating completion criteria.
             }
+
+            var indexWithinRange = !_expectedParamCount.HasValue || paramIndex < _expectedParamCount.Value;
+            if (!indexWithinRange && _expectedParamCount.HasValue)
+            {
+                _logger.LogWarning("Received param_index {ParamIndex} outside expected range 0-{MaxIndex}", paramIndex, _expectedParamCount.Value - 1);
+            }
+
+            if (indexWithinRange && _receivedParamIndices.Add(paramIndex))
+            {
+                if (_expectedParamCount.HasValue)
+                {
+                    _missingParamIndices.Remove(paramIndex);
+                }
+            }
+            _receivedParameterCount = _receivedParamIndices.Count;
+            _lastParamValueReceived = DateTime.UtcNow;
+            _retryAttempts = 0;
 
             if (_pendingParamWrites.TryGetValue(parameter.Name, out pendingWrite))
             {
                 _pendingParamWrites.Remove(parameter.Name);
             }
 
-            if (_parameterListCompletion != null && _expectedParamCount.HasValue)
+            if (_parameterListCompletion != null && _expectedParamCount.HasValue &&
+                _receivedParameterCount == _expectedParamCount.Value)
             {
-                var lastIndex = paramCount == 0 ? (int?)null : paramCount - 1;
-                if (_parameters.Count >= _expectedParamCount.Value ||
-                    (lastIndex.HasValue && paramIndex >= lastIndex.Value))
-                {
-                    listCompletion = _parameterListCompletion;
-                    _parameterListCompletion = null;
-                    _isParameterDownloadInProgress = false;
-                    _isParameterDownloadComplete = true;
-                }
+                listCompletion = _parameterListCompletion;
+                _parameterListCompletion = null;
+                _isParameterDownloadInProgress = false;
+                _isParameterDownloadComplete = true;
+                stopMonitor = true;
             }
             raiseProgress = true;
         }
 
         pendingWrite?.TrySetResult(parameter);
         listCompletion?.TrySetResult(true);
+        if (stopMonitor)
+        {
+            StopParameterMonitoring();
+        }
         if (raiseProgress)
         {
             ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private async Task MonitorParameterDownloadAsync(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await Task.Delay(_paramValueIdleTimeout, token);
+
+                List<ushort>? missingIndices = null;
+                bool triggerRetry = false;
+                bool triggerFailure = false;
+
+                lock (_sync)
+                {
+                    if (!_isParameterDownloadInProgress ||
+                        !_expectedParamCount.HasValue ||
+                        _missingParamIndices.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    if (_lastParamValueReceived != DateTime.MinValue &&
+                        DateTime.UtcNow - _lastParamValueReceived < _paramValueIdleTimeout)
+                    {
+                        continue;
+                    }
+
+                    missingIndices = new List<ushort>(_missingParamIndices.Count);
+                    foreach (var index in _missingParamIndices)
+                    {
+                        missingIndices.Add((ushort)index);
+                    }
+
+                    if (_retryAttempts >= _maxParameterRetries)
+                    {
+                        triggerFailure = true;
+                        _isParameterDownloadInProgress = false;
+                        _isParameterDownloadComplete = false;
+                        _parameterListCompletion?.TrySetResult(false);
+                        _parameterListCompletion = null;
+                    }
+                    else
+                    {
+                        _retryAttempts++;
+                        triggerRetry = true;
+                    }
+                }
+
+                if (triggerFailure)
+                {
+                    StopParameterMonitoring();
+                    ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
+                    break;
+                }
+
+                if (triggerRetry)
+                {
+                    foreach (var missingIndex in missingIndices)
+                    {
+                        ParameterReadRequested?.Invoke(this, new ParameterReadRequest(missingIndex));
+                    }
+
+                    ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during teardown
+        }
+    }
+
+    private void StopParameterMonitoring()
+    {
+        CancellationTokenSource? cts;
+        lock (_sync)
+        {
+            cts = _parameterDownloadCts;
+            _parameterDownloadCts = null;
+            _parameterDownloadMonitorTask = null;
+        }
+
+        if (cts != null)
+        {
+            cts.Cancel();
+            cts.Dispose();
         }
     }
 
@@ -258,13 +394,18 @@ public class ParameterService : IParameterService
             pendingWrites = _pendingParamWrites.Values.ToList();
             _pendingParamWrites.Clear();
             _parameters.Clear();
+            _receivedParamIndices.Clear();
+            _missingParamIndices.Clear();
             _expectedParamCount = null;
             _receivedParameterCount = 0;
+            _retryAttempts = 0;
+            _lastParamValueReceived = DateTime.MinValue;
             _isParameterDownloadInProgress = false;
             _isParameterDownloadComplete = false;
             raiseProgress = true;
         }
 
+        StopParameterMonitoring();
         listCompletion?.TrySetCanceled();
         foreach (var pending in pendingWrites)
         {

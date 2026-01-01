@@ -10,6 +10,7 @@ public interface IParameterService
     Task RefreshParametersAsync();
     event EventHandler? ParameterListRequested;
     event EventHandler<ParameterWriteRequest>? ParameterWriteRequested;
+    event EventHandler<ParameterReadRequest>? ParameterReadRequested;
     bool IsParameterDownloadInProgress { get; }
     bool IsParameterDownloadComplete { get; }
     int ReceivedParameterCount { get; }

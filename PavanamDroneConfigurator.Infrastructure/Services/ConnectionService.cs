@@ -39,6 +39,7 @@ public class ConnectionService : IConnectionService, IDisposable
     private const int MavlinkV1MinFrameLength = 8;
     private const int MavlinkV2MinFrameHeaderLength = 12;
     private const byte CrcExtraHeartbeat = 50;
+    private const byte CrcExtraParamRequestRead = 214;
     private const byte CrcExtraParamRequestList = 122;
     private const byte CrcExtraParamValue = 220;
     private const byte CrcExtraParamSet = 168;
@@ -74,6 +75,7 @@ public class ConnectionService : IConnectionService, IDisposable
         _parameterService = parameterService;
         _parameterService.ParameterListRequested += OnParameterListRequested;
         _parameterService.ParameterWriteRequested += OnParameterWriteRequested;
+        _parameterService.ParameterReadRequested += OnParameterReadRequested;
         _availablePorts = EnumerateSerialPorts();
         StartSerialPortWatcher();
     }
@@ -812,6 +814,11 @@ public class ConnectionService : IConnectionService, IDisposable
         SendParamSet(request);
     }
 
+    private void OnParameterReadRequested(object? sender, ParameterReadRequest request)
+    {
+        SendParamRequestRead(request.Index);
+    }
+
     private void SendParamRequestList()
     {
         if (!TryGetActiveStream(out var stream))
@@ -827,6 +834,27 @@ public class ConnectionService : IConnectionService, IDisposable
         payload[1] = targetComponent;
 
         var frame = BuildMavlink1Frame(21, payload);
+        SendFrame(stream, frame);
+    }
+
+    private void SendParamRequestRead(ushort paramIndex)
+    {
+        if (!TryGetActiveStream(out var stream))
+        {
+            _logger.LogWarning("Cannot send PARAM_REQUEST_READ - no active connection");
+            return;
+        }
+
+        var targetSystem = _targetSystemId == 0 ? DefaultTargetSystemId : _targetSystemId;
+        var targetComponent = _targetComponentId == 0 ? DefaultTargetComponentId : _targetComponentId;
+
+        var payload = new byte[20];
+        // param_id bytes (0-15) left empty when requesting by index
+        BinaryPrimitives.WriteInt16LittleEndian(payload.AsSpan(16, 2), (short)paramIndex);
+        payload[18] = targetSystem;
+        payload[19] = targetComponent;
+
+        var frame = BuildMavlink1Frame(20, payload);
         SendFrame(stream, frame);
     }
 
@@ -943,6 +971,7 @@ public class ConnectionService : IConnectionService, IDisposable
     private static byte GetCrcExtra(byte messageId) => messageId switch
     {
         0 => CrcExtraHeartbeat,
+        20 => CrcExtraParamRequestRead,
         21 => CrcExtraParamRequestList,
         22 => CrcExtraParamValue,
         23 => CrcExtraParamSet,

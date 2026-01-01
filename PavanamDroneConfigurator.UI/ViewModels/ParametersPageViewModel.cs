@@ -35,6 +35,7 @@ public partial class ParametersPageViewModel : ViewModelBase
         // Subscribe to connection state changes
         _connectionService.ConnectionStateChanged += OnConnectionStateChanged;
         _parameterService.ParameterDownloadProgressChanged += OnParameterDownloadProgressChanged;
+        _parameterService.ParameterUpdated += OnParameterUpdated;
         
         // Initialize can edit state
         CanEditParameters = _connectionService.IsConnected && _parameterService.IsParameterDownloadComplete;
@@ -132,6 +133,34 @@ public partial class ParametersPageViewModel : ViewModelBase
     private void OnParameterDownloadProgressChanged(object? sender, EventArgs e)
     {
         Dispatcher.UIThread.InvokeAsync(UpdateParameterDownloadStateAsync);
+    }
+
+    private void OnParameterUpdated(object? sender, string parameterName)
+    {
+        Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var updatedParameter = await _parameterService.GetParameterAsync(parameterName);
+            if (updatedParameter == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < Parameters.Count; i++)
+            {
+                if (string.Equals(Parameters[i].Name, updatedParameter.Name, StringComparison.OrdinalIgnoreCase))
+                {
+                    Parameters[i] = updatedParameter;
+                    if (SelectedParameter != null &&
+                        string.Equals(SelectedParameter.Name, updatedParameter.Name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        SelectedParameter = updatedParameter;
+                    }
+                    return;
+                }
+            }
+
+            Parameters.Add(updatedParameter);
+        });
     }
 
     private async Task UpdateParameterDownloadStateAsync()

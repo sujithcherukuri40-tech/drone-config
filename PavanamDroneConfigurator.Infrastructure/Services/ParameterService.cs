@@ -321,6 +321,7 @@ public class ParameterService : IParameterService
 
     /// <summary>
     /// Ensures the download completion notification is raised only once per download lifecycle.
+    /// Callers must hold <see cref=\"_sync\"/> when invoking.
     /// </summary>
     private bool TryMarkDownloadCompleted()
     {

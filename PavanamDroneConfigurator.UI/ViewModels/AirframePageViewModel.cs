@@ -292,15 +292,15 @@ public partial class AirframePageViewModel : ViewModelBase
 
         if (frameTypeValue.HasValue)
         {
-            var typedMatch = filtered.FirstOrDefault(a =>
-                a.FrameType.HasValue && a.FrameType.Value == frameTypeValue.Value);
+            var typedMatch = filtered.FirstOrDefault(a => a.FrameType == frameTypeValue);
             if (typedMatch != null)
             {
                 return typedMatch;
             }
         }
 
-        if (!frameTypeValue.HasValue && filtered.All(a => !a.FrameType.HasValue))
+        var hasFrameTypeValues = filtered.Any(a => a.FrameType.HasValue);
+        if (!frameTypeValue.HasValue && !hasFrameTypeValues)
         {
             return filtered[0];
         }

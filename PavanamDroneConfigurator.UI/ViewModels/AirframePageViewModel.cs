@@ -284,7 +284,7 @@ public partial class AirframePageViewModel : ViewModelBase
 
     private static AirframeOption? FindMatchingAirframe(IEnumerable<AirframeOption> candidates, int? frameTypeValue)
     {
-        var filtered = candidates.ToList();
+        var filtered = candidates as IList<AirframeOption> ?? candidates.ToList();
         if (filtered.Count == 0)
         {
             return null;
@@ -302,13 +302,13 @@ public partial class AirframePageViewModel : ViewModelBase
 
         if (!frameTypeValue.HasValue && filtered.All(a => !a.FrameType.HasValue))
         {
-            return filtered.FirstOrDefault();
+            return filtered[0];
         }
 
         if (filtered.Count == 1)
         {
-            var single = filtered.FirstOrDefault();
-            if (single != null && !single.FrameType.HasValue)
+            var single = filtered[0];
+            if (!single.FrameType.HasValue)
             {
                 return single;
             }

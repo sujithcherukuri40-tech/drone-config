@@ -242,7 +242,7 @@ public partial class AirframePageViewModel : ViewModelBase
             var frameTypeValue = frameTypeParam != null ? (int?)frameTypeParam.Value : null;
             var candidates = Airframes.Where(a => a.FrameClass == frameClassValue);
 
-            var match = FindMatchingAirframe(candidates, frameClassValue, frameTypeValue);
+            var match = FindMatchingAirframe(candidates, frameTypeValue);
 
             if (match != null)
             {
@@ -282,9 +282,9 @@ public partial class AirframePageViewModel : ViewModelBase
         });
     }
 
-    private static AirframeOption? FindMatchingAirframe(IEnumerable<AirframeOption> candidates, int frameClassValue, int? frameTypeValue)
+    private static AirframeOption? FindMatchingAirframe(IEnumerable<AirframeOption> candidates, int? frameTypeValue)
     {
-        var filtered = candidates.Where(a => a.FrameClass == frameClassValue).ToList();
+        var filtered = candidates.ToList();
         if (filtered.Count == 0)
         {
             return null;
@@ -302,12 +302,16 @@ public partial class AirframePageViewModel : ViewModelBase
 
         if (!frameTypeValue.HasValue && filtered.All(a => !a.FrameType.HasValue))
         {
-            return filtered.First();
+            return filtered.FirstOrDefault();
         }
 
-        if (filtered.Count == 1 && !filtered[0].FrameType.HasValue)
+        if (filtered.Count == 1)
         {
-            return filtered[0];
+            var single = filtered.FirstOrDefault();
+            if (single != null && !single.FrameType.HasValue)
+            {
+                return single;
+            }
         }
 
         return null;

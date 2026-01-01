@@ -80,12 +80,12 @@ public partial class MainWindowViewModel : ViewModelBase
         });
     }
 
-    private void OnParameterDownloadCompleted(object? sender, EventArgs e)
+    private void OnParameterDownloadCompleted(object? sender, bool completedSuccessfully)
     {
         Dispatcher.UIThread.Post(() =>
         {
             IsParameterDownloadInProgress = false;
-            IsParameterDownloadComplete = _parameterService.IsParameterDownloadComplete;
+            IsParameterDownloadComplete = completedSuccessfully;
             UpdateProgress();
             UpdateAccessPermissions();
         });

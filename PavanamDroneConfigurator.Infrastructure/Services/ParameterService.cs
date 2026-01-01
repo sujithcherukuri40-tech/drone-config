@@ -32,7 +32,7 @@ public class ParameterService : IParameterService
     public event EventHandler<ParameterReadRequest>? ParameterReadRequested;
     public event EventHandler<string>? ParameterUpdated;
     public event EventHandler? ParameterDownloadStarted;
-    public event EventHandler? ParameterDownloadCompleted;
+    public event EventHandler<bool>? ParameterDownloadCompleted;
     public event EventHandler? ParameterDownloadProgressChanged;
 
     public ParameterService(ILogger<ParameterService> logger)
@@ -232,7 +232,7 @@ public class ParameterService : IParameterService
             StopParameterMonitoring();
             if (raiseCompletedEvent)
             {
-                ParameterDownloadCompleted?.Invoke(this, EventArgs.Empty);
+                ParameterDownloadCompleted?.Invoke(this, false);
             }
             ParameterDownloadProgressChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -310,7 +310,7 @@ public class ParameterService : IParameterService
         }
         if (raiseCompletedEvent)
         {
-            ParameterDownloadCompleted?.Invoke(this, EventArgs.Empty);
+            ParameterDownloadCompleted?.Invoke(this, true);
         }
         ParameterUpdated?.Invoke(this, parameterName);
         if (raiseProgress)
@@ -412,7 +412,7 @@ public class ParameterService : IParameterService
 
                 if (raiseCompletedEvent)
                 {
-                    ParameterDownloadCompleted?.Invoke(this, EventArgs.Empty);
+                    ParameterDownloadCompleted?.Invoke(this, true);
                 }
 
                 if (raiseProgress)
@@ -484,7 +484,7 @@ public class ParameterService : IParameterService
         // Reset can interrupt an in-progress download; surface completion so listeners can close progress UI.
         if (raiseCompletedEvent)
         {
-            ParameterDownloadCompleted?.Invoke(this, EventArgs.Empty);
+            ParameterDownloadCompleted?.Invoke(this, false);
         }
 
         if (raiseProgress)

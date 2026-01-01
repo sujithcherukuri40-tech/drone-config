@@ -5,7 +5,6 @@ using PavanamDroneConfigurator.Core.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -119,7 +118,7 @@ public partial class AirframePageViewModel : ViewModelBase
             StatusMessage = $"Applying {SelectedAirframe.Name}...";
 
             var frameClassResult = await _parameterService.SetParameterAsync("FRAME_CLASS", SelectedAirframe.FrameClass);
-            var frameTypeResult = !SelectedAirframe.FrameType.HasValue;
+            var frameTypeResult = true;
             if (!frameClassResult)
             {
                 frameTypeResult = false;
@@ -315,12 +314,13 @@ public partial class AirframePageViewModel : ViewModelBase
 
     private static bool TryParseParameterValue(float value, out int parsed)
     {
-        return int.TryParse(value.ToString(CultureInfo.InvariantCulture), out parsed);
+        parsed = (int)value;
+        return Math.Abs(value - parsed) < float.Epsilon;
     }
 
     private static AirframeOption? FindMatchingAirframe(IEnumerable<AirframeOption> candidates, int? frameTypeValue)
     {
-        var filtered = candidates.ToList();
+        var filtered = candidates as IList<AirframeOption> ?? candidates.ToArray();
         if (filtered.Count == 0)
         {
             return null;

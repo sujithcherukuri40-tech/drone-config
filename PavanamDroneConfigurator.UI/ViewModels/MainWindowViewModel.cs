@@ -12,6 +12,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ParametersPageViewModel ParametersPage { get; }
     public CalibrationPageViewModel CalibrationPage { get; }
     public SafetyPageViewModel SafetyPage { get; }
+    public AirframePageViewModel AirframePage { get; }
     public ProfilePageViewModel ProfilePage { get; }
 
     public MainWindowViewModel(
@@ -20,6 +21,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ParametersPageViewModel parametersPage,
         CalibrationPageViewModel calibrationPage,
         SafetyPageViewModel safetyPage,
+        AirframePageViewModel airframePage,
         ProfilePageViewModel profilePage)
     {
         ConnectionPage = connectionPage;
@@ -27,6 +29,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ParametersPage = parametersPage;
         CalibrationPage = calibrationPage;
         SafetyPage = safetyPage;
+        AirframePage = airframePage;
         ProfilePage = profilePage;
 
         _currentPage = connectionPage;

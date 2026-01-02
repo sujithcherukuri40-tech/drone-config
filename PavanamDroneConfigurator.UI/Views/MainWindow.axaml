@@ -23,6 +23,7 @@
                 <Button Content="Parameters" CommandParameter="{Binding ParametersPage}" Click="NavButton_Click" />
                 <Button Content="Calibration" CommandParameter="{Binding CalibrationPage}" Click="NavButton_Click" />
                 <Button Content="Safety" CommandParameter="{Binding SafetyPage}" Click="NavButton_Click" />
+                <Button Content="Airframe" CommandParameter="{Binding AirframePage}" Click="NavButton_Click" />
                 <Button Content="Profiles" CommandParameter="{Binding ProfilePage}" Click="NavButton_Click" />
             </StackPanel>
         </Border>
@@ -44,6 +45,9 @@
                 </DataTemplate>
                 <DataTemplate DataType="vm:SafetyPageViewModel">
                     <views:SafetyPage />
+                </DataTemplate>
+                <DataTemplate DataType="vm:AirframePageViewModel">
+                    <views:AirframePage />
                 </DataTemplate>
                 <DataTemplate DataType="vm:ProfilePageViewModel">
                     <views:ProfilePage />

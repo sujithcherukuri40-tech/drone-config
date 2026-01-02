@@ -6,7 +6,6 @@ public interface IParameterService
 {
     Task<List<DroneParameter>> GetAllParametersAsync();
     Task<DroneParameter?> GetParameterAsync(string name);
-    Task<DroneParameter?> GetParameterAsync(string name, bool forceRefresh);
     Task<bool> SetParameterAsync(string name, float value);
     Task RefreshParametersAsync();
     

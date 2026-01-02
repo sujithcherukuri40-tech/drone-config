@@ -11,7 +11,6 @@ public partial class SafetyPageViewModel : ViewModelBase
 {
     private readonly ISafetyService _safetyService;
     private readonly IConnectionService _connectionService;
-    private readonly IParameterService _parameterService;
 
     [ObservableProperty]
     private string _statusMessage = string.Empty;
@@ -121,11 +120,10 @@ public partial class SafetyPageViewModel : ViewModelBase
         FailsafeAction.Disarm
     };
 
-    public SafetyPageViewModel(ISafetyService safetyService, IConnectionService connectionService, IParameterService parameterService)
+    public SafetyPageViewModel(ISafetyService safetyService, IConnectionService connectionService)
     {
         _safetyService = safetyService;
         _connectionService = connectionService;
-        _parameterService = parameterService;
 
         _connectionService.ConnectionStateChanged += OnConnectionStateChanged;
         IsConnected = _connectionService.IsConnected;
@@ -226,7 +224,7 @@ public partial class SafetyPageViewModel : ViewModelBase
         }
 
         IsLoading = true;
-        StatusMessage = "Applying safety settings to drone...";
+        StatusMessage = "Applying safety settings...";
 
         try
         {
@@ -270,21 +268,14 @@ public partial class SafetyPageViewModel : ViewModelBase
                 MotEmergencyStop = MotEmergencyStop
             };
 
-            StatusMessage = "Sending parameters to drone... (This may take 30-60 seconds)";
             var success = await _safetyService.UpdateSafetySettingsAsync(settings);
-            
-            if (success)
-            {
-                StatusMessage = "? Safety settings applied successfully! Values have been updated on the drone.";
-            }
-            else
-            {
-                StatusMessage = "? Some safety settings failed to apply. Check console logs for details.";
-            }
+            StatusMessage = success 
+                ? "Safety settings applied successfully" 
+                : "Failed to apply safety settings";
         }
         catch (Exception ex)
         {
-            StatusMessage = $"? Error applying settings: {ex.Message}";
+            StatusMessage = $"Error applying settings: {ex.Message}";
         }
         finally
         {
@@ -295,28 +286,7 @@ public partial class SafetyPageViewModel : ViewModelBase
     [RelayCommand]
     private async Task RefreshSettingsAsync()
     {
-        if (!IsConnected)
-        {
-            StatusMessage = "Not connected. Please connect first.";
-            return;
-        }
-
-        IsLoading = true;
-        StatusMessage = "Refreshing parameters from drone...";
-
-        try
-        {
-            // Clear parameter cache and request fresh values from drone
-            await _parameterService.RefreshParametersAsync();
-            
-            // Now load the fresh values
-            await LoadSettingsAsync();
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error refreshing settings: {ex.Message}";
-            IsLoading = false;
-        }
+        await LoadSettingsAsync();
     }
 
     private void DecodeArmingChecks(int bitmask)

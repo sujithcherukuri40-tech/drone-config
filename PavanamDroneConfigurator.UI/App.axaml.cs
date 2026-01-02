@@ -40,6 +40,7 @@ public partial class App : Application
         services.AddSingleton<IParameterService, ParameterService>();
         services.AddSingleton<ICalibrationService, CalibrationService>();
         services.AddSingleton<ISafetyService, SafetyService>();
+        services.AddSingleton<IAirframeService, AirframeService>();
         services.AddSingleton<IPersistenceService, PersistenceService>();
 
         // ViewModels
@@ -49,6 +50,7 @@ public partial class App : Application
         services.AddTransient<ParametersPageViewModel>();
         services.AddTransient<CalibrationPageViewModel>();
         services.AddTransient<SafetyPageViewModel>();
+        services.AddTransient<AirframePageViewModel>();
         services.AddTransient<ProfilePageViewModel>();
 
         Services = services.BuildServiceProvider();

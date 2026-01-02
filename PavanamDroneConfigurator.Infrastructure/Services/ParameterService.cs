@@ -16,7 +16,13 @@ public class ParameterService : IParameterService
     private const byte TargetSystemId = 1;
     private const byte TargetComponentId = 1;
     private const int ParameterTimeoutMs = 5000;
+    private const int EepromWriteTimeoutMs = 5000; // Timeout for initial PARAM_SET with EEPROM write
+    private const int VerificationTimeoutMs = 3000; // Timeout for verification reads
+    private const int EepromWriteDelayMs = 200; // Delay to allow EEPROM write to complete
+    private const float FloatComparisonTolerance = 0.001f; // Tolerance for floating point comparisons
     private byte _sequenceNumber = 0;
+
+    public event EventHandler<DroneParameter>? ParameterUpdated;
 
     public ParameterService(ILogger<ParameterService> logger, IConnectionService connectionService)
     {
@@ -120,58 +126,117 @@ public class ParameterService : IParameterService
             await SendParameterSetAsync(name, value);
             
             // Wait for the parameter to be updated (indicated by receiving PARAM_VALUE)
-            var startTime = DateTime.UtcNow;
-            var timeout = TimeSpan.FromMilliseconds(3000); // Increased to 3 seconds
-            bool receivedUpdate = false;
-            
-            while ((DateTime.UtcNow - startTime) < timeout)
-            {
-                await Task.Delay(100);
-                
-                // Check if parameter was updated
-                if (_parameters.TryGetValue(name, out var param))
-                {
-                    _logger.LogDebug("Checking parameter {Name}: current={CurrentValue}, target={TargetValue}", 
-                        name, param.Value, value);
-                    
-                    // Allow small floating point differences
-                    if (Math.Abs(param.Value - value) < 0.001f)
-                    {
-                        receivedUpdate = true;
-                        _logger.LogInformation("? Successfully set parameter {Name} = {Value} (confirmed via PARAM_VALUE)", 
-                            name, value);
-                        break;
-                    }
-                    else if (Math.Abs(param.Value - beforeValue) > 0.001f)
-                    {
-                        // Value changed but not to what we expected
-                        _logger.LogWarning("Parameter {Name} changed from {Before} to {After}, but expected {Expected}", 
-                            name, beforeValue, param.Value, value);
-                    }
-                }
-            }
+            bool receivedUpdate = await WaitForParameterUpdateAsync(name, value, EepromWriteTimeoutMs, 
+                "Successfully set parameter");
             
             if (!receivedUpdate)
             {
-                _logger.LogWarning("?? Timeout waiting for parameter {Name} to be set to {Value}. " +
-                    "Parameter may have been set but confirmation not received.", name, value);
+                _logger.LogWarning("⚠️ Timeout waiting for parameter {Name} to be set to {Value}. " +
+                    "Attempting verification by re-reading parameter...", name, value);
                 
-                // Check one more time after timeout
-                if (_parameters.TryGetValue(name, out var finalParam))
+                // Force a fresh read from the drone to verify the parameter was actually written
+                _parameters.TryRemove(name, out _);
+                await RequestParameterReadAsync(name);
+                
+                bool verified = await VerifyParameterMatchesAsync(name, value, VerificationTimeoutMs,
+                    "Parameter verified by re-reading from drone");
+                
+                if (!verified)
                 {
-                    _logger.LogWarning("Final cached value for {Name}: {FinalValue}", name, finalParam.Value);
+                    _logger.LogError("❌ Failed to verify parameter {Name} = {Value} after re-reading", name, value);
+                    return false;
                 }
-                
-                return false;
             }
             
-            return true;
+            // Final verification: Re-read the parameter one more time to ensure it was persisted
+            _logger.LogDebug("Performing final verification of parameter {Name}", name);
+            _parameters.TryRemove(name, out _);
+            await Task.Delay(EepromWriteDelayMs); // Allow EEPROM write to complete
+            
+            await RequestParameterReadAsync(name);
+            
+            bool finalVerified = await VerifyParameterMatchesAsync(name, value, VerificationTimeoutMs,
+                "Parameter CONFIRMED persisted on drone");
+            
+            return finalVerified;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error setting parameter {Name}", name);
             return false;
         }
+    }
+
+    /// <summary>
+    /// Waits for a parameter to be updated to the expected value.
+    /// Continues waiting until timeout even if mismatched values are received.
+    /// Used after sending PARAM_SET to wait for the drone to respond.
+    /// </summary>
+    private async Task<bool> WaitForParameterUpdateAsync(string name, float expectedValue, int timeoutMs, 
+        string successMessage)
+    {
+        var startTime = DateTime.UtcNow;
+        var timeout = TimeSpan.FromMilliseconds(timeoutMs);
+        
+        while ((DateTime.UtcNow - startTime) < timeout)
+        {
+            await Task.Delay(100);
+            
+            if (_parameters.TryGetValue(name, out var param))
+            {
+                _logger.LogDebug("Checking parameter {Name}: current={CurrentValue}, target={TargetValue}", 
+                    name, param.Value, expectedValue);
+                
+                // Allow small floating point differences
+                if (Math.Abs(param.Value - expectedValue) < FloatComparisonTolerance)
+                {
+                    _logger.LogInformation("✓ {Message}: {Name} = {Value}", successMessage, name, expectedValue);
+                    return true;
+                }
+                // Continue waiting - the drone might still be processing the update
+            }
+        }
+        
+        return false;
+    }
+
+    /// <summary>
+    /// Verifies that a parameter matches the expected value.
+    /// Returns false immediately if a mismatched value is received.
+    /// Used after explicitly requesting a parameter to verify it was persisted correctly.
+    /// </summary>
+    private async Task<bool> VerifyParameterMatchesAsync(string name, float expectedValue, int timeoutMs, 
+        string successMessage)
+    {
+        var startTime = DateTime.UtcNow;
+        var timeout = TimeSpan.FromMilliseconds(timeoutMs);
+        
+        while ((DateTime.UtcNow - startTime) < timeout)
+        {
+            await Task.Delay(100);
+            
+            if (_parameters.TryGetValue(name, out var param))
+            {
+                _logger.LogDebug("Verifying parameter {Name}: current={CurrentValue}, expected={ExpectedValue}", 
+                    name, param.Value, expectedValue);
+                
+                // Allow small floating point differences
+                if (Math.Abs(param.Value - expectedValue) < FloatComparisonTolerance)
+                {
+                    _logger.LogInformation("✓ {Message}: {Name} = {Value}", successMessage, name, expectedValue);
+                    return true;
+                }
+                else
+                {
+                    // Mismatch detected - parameter was not persisted correctly
+                    _logger.LogError("❌ Parameter {Name} verification failed: expected {Expected}, got {Actual}", 
+                        name, expectedValue, param.Value);
+                    return false;
+                }
+            }
+        }
+        
+        return false;
     }
 
     public async Task RefreshParametersAsync()
@@ -434,7 +499,10 @@ public class ParameterService : IParameterService
         };
 
         _parameters[name] = param;
-        _logger.LogInformation("??? PARAM_VALUE: {Name} = {Value} (#{Index}/{Count})", 
+        _logger.LogInformation("📥 PARAM_VALUE: {Name} = {Value} (#{Index}/{Count})", 
             name, value, index + 1, count);
+        
+        // Notify subscribers that this parameter was updated
+        ParameterUpdated?.Invoke(this, param);
     }
 }

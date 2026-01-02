@@ -126,7 +126,106 @@ public partial class SafetyPageViewModel : ViewModelBase
         _connectionService = connectionService;
 
         _connectionService.ConnectionStateChanged += OnConnectionStateChanged;
+        _parameterService.ParameterUpdated += OnParameterUpdated;
         IsConnected = _connectionService.IsConnected;
+    }
+
+    private void OnParameterUpdated(object? sender, DroneParameter updatedParam)
+    {
+        try
+        {
+            // Update the corresponding UI property when parameter changes
+            switch (updatedParam.Name)
+            {
+                // Battery Failsafe
+                case "BATT_MONITOR":
+                    BattMonitor = updatedParam.Value;
+                    break;
+                case "BATT_LOW_VOLT":
+                    BattLowVolt = updatedParam.Value;
+                    break;
+                case "BATT_CRT_VOLT":
+                    BattCrtVolt = updatedParam.Value;
+                    break;
+                case "BATT_FS_LOW_ACT":
+                    BattFsLowAct = (FailsafeAction)updatedParam.Value;
+                    break;
+                case "BATT_FS_CRT_ACT":
+                    BattFsCrtAct = (FailsafeAction)updatedParam.Value;
+                    break;
+                case "BATT_CAPACITY":
+                    BattCapacity = updatedParam.Value;
+                    break;
+
+                // RC Failsafe
+                case "FS_THR_ENABLE":
+                    FsThrEnable = updatedParam.Value;
+                    break;
+                case "FS_THR_VALUE":
+                    FsThrValue = updatedParam.Value;
+                    break;
+                case "FS_THR_ACTION":
+                    FsThrAction = (FailsafeAction)updatedParam.Value;
+                    break;
+
+                // GCS Failsafe
+                case "FS_GCS_ENABLE":
+                    FsGcsEnable = updatedParam.Value;
+                    break;
+                case "FS_GCS_TIMEOUT":
+                    FsGcsTimeout = updatedParam.Value;
+                    break;
+                case "FS_GCS_ACTION":
+                    FsGcsAction = (FailsafeAction)updatedParam.Value;
+                    break;
+
+                // Crash / Land Safety
+                case "CRASH_DETECT":
+                    CrashDetect = updatedParam.Value;
+                    break;
+                case "CRASH_ACTION":
+                    CrashAction = (FailsafeAction)updatedParam.Value;
+                    break;
+                case "LAND_DETECT":
+                    LandDetect = updatedParam.Value;
+                    break;
+
+                // Arming Checks
+                case "ARMING_CHECK":
+                    DecodeArmingChecks((int)updatedParam.Value);
+                    break;
+
+                // Geo-Fence
+                case "FENCE_ENABLE":
+                    FenceEnable = updatedParam.Value;
+                    break;
+                case "FENCE_TYPE":
+                    FenceType = updatedParam.Value;
+                    break;
+                case "FENCE_ALT_MAX":
+                    FenceAltMax = updatedParam.Value;
+                    break;
+                case "FENCE_RADIUS":
+                    FenceRadius = updatedParam.Value;
+                    break;
+                case "FENCE_ACTION":
+                    FenceAction = (FailsafeAction)updatedParam.Value;
+                    break;
+
+                // Motor Safety
+                case "MOT_SAFE_DISARM":
+                    MotSafeDisarm = updatedParam.Value;
+                    break;
+                case "MOT_EMERGENCY_STOP":
+                    MotEmergencyStop = updatedParam.Value;
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log error but don't crash the app
+            StatusMessage = $"Error updating parameter {updatedParam.Name}: {ex.Message}";
+        }
     }
 
     private async void OnConnectionStateChanged(object? sender, bool connected)
@@ -314,5 +413,16 @@ public partial class SafetyPageViewModel : ViewModelBase
         if (ArmingCheckEkf) bitmask |= 0x400;      // Bit 10: Logging/EKF
         
         return bitmask;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            // Unsubscribe from events to prevent memory leaks
+            _connectionService.ConnectionStateChanged -= OnConnectionStateChanged;
+            _parameterService.ParameterUpdated -= OnParameterUpdated;
+        }
+        base.Dispose(disposing);
     }
 }

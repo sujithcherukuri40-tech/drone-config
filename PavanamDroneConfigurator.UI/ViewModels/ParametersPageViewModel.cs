@@ -1,8 +1,9 @@
+using System.Collections.ObjectModel;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PavanamDroneConfigurator.Core.Interfaces;
 using PavanamDroneConfigurator.Core.Models;
-using System.Collections.ObjectModel;
 
 namespace PavanamDroneConfigurator.UI.ViewModels;
 
@@ -31,8 +32,36 @@ public partial class ParametersPageViewModel : ViewModelBase
         // Subscribe to connection state changes
         _connectionService.ConnectionStateChanged += OnConnectionStateChanged;
         
+        // Subscribe to parameter updates
+        _parameterService.ParameterUpdated += OnParameterUpdated;
+        
         // Initialize can edit state
         CanEditParameters = _connectionService.IsConnected;
+    }
+
+    private void OnParameterUpdated(object? sender, DroneParameter updatedParam)
+    {
+        try
+        {
+            // Find the parameter in the UI collection and update it
+            var existingParam = Parameters.FirstOrDefault(p => p.Name == updatedParam.Name);
+            if (existingParam != null)
+            {
+                // Update the existing parameter's value
+                existingParam.Value = updatedParam.Value;
+                existingParam.Description = updatedParam.Description;
+                StatusMessage = $"Parameter {updatedParam.Name} updated to {updatedParam.Value}";
+            }
+            else
+            {
+                // Add new parameter if it doesn't exist (for initial loads)
+                Parameters.Add(updatedParam);
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error updating parameter: {ex.Message}";
+        }
     }
 
     private async void OnConnectionStateChanged(object? sender, bool connected)
@@ -148,6 +177,7 @@ public partial class ParametersPageViewModel : ViewModelBase
         {
             // Unsubscribe from events to prevent memory leaks
             _connectionService.ConnectionStateChanged -= OnConnectionStateChanged;
+            _parameterService.ParameterUpdated -= OnParameterUpdated;
         }
         base.Dispose(disposing);
     }

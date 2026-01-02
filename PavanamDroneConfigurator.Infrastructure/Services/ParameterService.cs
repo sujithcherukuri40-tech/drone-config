@@ -19,6 +19,7 @@ public class ParameterService : IParameterService
     private const int EepromWriteTimeoutMs = 5000; // Timeout for initial PARAM_SET with EEPROM write
     private const int VerificationTimeoutMs = 3000; // Timeout for verification reads
     private const int EepromWriteDelayMs = 200; // Delay to allow EEPROM write to complete
+    private const float FloatComparisonTolerance = 0.001f; // Tolerance for floating point comparisons
     private byte _sequenceNumber = 0;
 
     public event EventHandler<DroneParameter>? ParameterUpdated;
@@ -187,7 +188,7 @@ public class ParameterService : IParameterService
                     name, param.Value, expectedValue);
                 
                 // Allow small floating point differences
-                if (Math.Abs(param.Value - expectedValue) < 0.001f)
+                if (Math.Abs(param.Value - expectedValue) < FloatComparisonTolerance)
                 {
                     _logger.LogInformation("✓ {Message}: {Name} = {Value}", successMessage, name, expectedValue);
                     return true;
@@ -220,7 +221,7 @@ public class ParameterService : IParameterService
                     name, param.Value, expectedValue);
                 
                 // Allow small floating point differences
-                if (Math.Abs(param.Value - expectedValue) < 0.001f)
+                if (Math.Abs(param.Value - expectedValue) < FloatComparisonTolerance)
                 {
                     _logger.LogInformation("✓ {Message}: {Name} = {Value}", successMessage, name, expectedValue);
                     return true;

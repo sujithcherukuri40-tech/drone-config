@@ -5,29 +5,81 @@
              x:DataType="vm:SafetyPageViewModel">
 
     <ScrollViewer>
-        <StackPanel Margin="20" Spacing="15">
-            <TextBlock Text="Safety Settings" FontSize="24" FontWeight="Bold" />
-
-            <Button Content="Load Settings" Command="{Binding LoadSettingsCommand}" />
-            <TextBlock Text="{Binding StatusMessage}" />
-
-            <StackPanel Spacing="10" Margin="0,20,0,0">
-                <TextBlock Text="Battery Low Voltage:" />
-                <NumericUpDown Value="{Binding Settings.BatteryLowVoltage}" Increment="0.1" FormatString="F1" />
-
-                <TextBlock Text="Battery Critical Voltage:" />
-                <NumericUpDown Value="{Binding Settings.BatteryCriticalVoltage}" Increment="0.1" FormatString="F1" />
-
-                <TextBlock Text="Return To Launch Altitude (m):" />
-                <NumericUpDown Value="{Binding Settings.ReturnToLaunchAltitude}" Increment="1" FormatString="F0" />
-
-                <CheckBox Content="Geofence Enabled" IsChecked="{Binding Settings.GeofenceEnabled}" />
-
-                <TextBlock Text="Geofence Radius (m):" />
-                <NumericUpDown Value="{Binding Settings.GeofenceRadius}" Increment="10" FormatString="F0" />
+        <StackPanel Margin="20" Spacing="16">
+            <TextBlock Text="Safety" FontSize="24" FontWeight="Bold" />
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <TextBlock Text="{Binding StatusMessage}" FontSize="14" />
+                <ProgressBar Width="120" Height="8" IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
             </StackPanel>
 
-            <Button Content="Save Settings" Command="{Binding SaveSettingsCommand}" Margin="0,20,0,0" />
+            <Border BorderBrush="#DDD" BorderThickness="1" Padding="12" CornerRadius="4" IsEnabled="{Binding IsPageEnabled}">
+                <StackPanel Spacing="18">
+                    <!-- Section 1: Arming Checks -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Arming Checks" FontSize="18" FontWeight="SemiBold" />
+                        <UniformGrid Columns="2" Rows="3" ColumnSpacing="8" RowSpacing="6">
+                            <CheckBox Content="Accelerometer" IsChecked="{Binding AccelerometerCheck}" />
+                            <CheckBox Content="Compass" IsChecked="{Binding CompassCheck}" />
+                            <CheckBox Content="GPS" IsChecked="{Binding GpsCheck}" />
+                            <CheckBox Content="Barometer" IsChecked="{Binding BarometerCheck}" />
+                            <CheckBox Content="RC" IsChecked="{Binding RcCheck}" />
+                            <CheckBox Content="INS" IsChecked="{Binding InsCheck}" />
+                        </UniformGrid>
+                    </StackPanel>
+
+                    <!-- Section 2: Battery Failsafe -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Battery Failsafe" FontSize="18" FontWeight="SemiBold" />
+                        <StackPanel Orientation="Vertical" Spacing="6">
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBlock Text="Low action" Width="140" VerticalAlignment="Center" />
+                                <ComboBox ItemsSource="{Binding BatteryActionOptions}"
+                                          SelectedItem="{Binding SelectedBattLowAction}"
+                                          DisplayMemberBinding="{Binding Label}"
+                                          Width="180" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBlock Text="Critical action" Width="140" VerticalAlignment="Center" />
+                                <ComboBox ItemsSource="{Binding BatteryActionOptions}"
+                                          SelectedItem="{Binding SelectedBattCriticalAction}"
+                                          DisplayMemberBinding="{Binding Label}"
+                                          Width="180" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Section 3: RC Failsafe -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="RC Failsafe" FontSize="18" FontWeight="SemiBold" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="Action" Width="140" VerticalAlignment="Center" />
+                            <ComboBox ItemsSource="{Binding RcFailsafeOptions}"
+                                      SelectedItem="{Binding SelectedRcFailsafeAction}"
+                                      DisplayMemberBinding="{Binding Label}"
+                                      Width="220" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Section 4: GeoFence -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="GeoFence" FontSize="18" FontWeight="SemiBold" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="Fence Enabled" Width="140" VerticalAlignment="Center" />
+                            <ToggleSwitch IsChecked="{Binding FenceEnabled}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="Fence Action" Width="140" VerticalAlignment="Center" />
+                            <ComboBox ItemsSource="{Binding FenceActionOptions}"
+                                      SelectedItem="{Binding SelectedFenceAction}"
+                                      DisplayMemberBinding="{Binding Label}"
+                                      Width="180"
+                                      IsEnabled="{Binding FenceEnabled}" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Page unlocks automatically after parameters finish downloading." Foreground="Gray" FontSize="12" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

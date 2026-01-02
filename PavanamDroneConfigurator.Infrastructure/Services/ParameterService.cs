@@ -18,6 +18,8 @@ public class ParameterService : IParameterService
     private const int ParameterTimeoutMs = 5000;
     private byte _sequenceNumber = 0;
 
+    public event EventHandler<DroneParameter>? ParameterUpdated;
+
     public ParameterService(ILogger<ParameterService> logger, IConnectionService connectionService)
     {
         _logger = logger;
@@ -434,7 +436,10 @@ public class ParameterService : IParameterService
         };
 
         _parameters[name] = param;
-        _logger.LogInformation("??? PARAM_VALUE: {Name} = {Value} (#{Index}/{Count})", 
+        _logger.LogInformation("📥 PARAM_VALUE: {Name} = {Value} (#{Index}/{Count})", 
             name, value, index + 1, count);
+        
+        // Notify subscribers that this parameter was updated
+        ParameterUpdated?.Invoke(this, param);
     }
 }

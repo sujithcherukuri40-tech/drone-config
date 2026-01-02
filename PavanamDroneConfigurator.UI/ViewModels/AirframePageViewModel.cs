@@ -120,6 +120,7 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
 
         _connectionService.ConnectionStateChanged += OnConnectionStateChanged;
         _parameterService.ParameterUpdated += OnParameterUpdated;
+        _parameterService.ParameterDownloadProgressChanged += OnParameterDownloadProgressChanged;
 
         UpdateAvailability();
     }
@@ -268,21 +269,57 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        ScheduleSyncFromParameters(forceStatusUpdate: true);
+        var forceStatusUpdate = !_parameterService.IsParameterDownloadInProgress;
+        ScheduleSyncFromParameters(forceStatusUpdate);
     }
 
     private void UpdateAvailability()
     {
-        var connected = _connectionService.IsConnected;
-        IsPageEnabled = connected;
+        UpdatePageEnabled();
 
-        if (!connected)
+        if (!_connectionService.IsConnected)
         {
             StatusMessage = "Connect to a vehicle to edit FRAME_CLASS and FRAME_TYPE.";
             return;
         }
 
-        ScheduleSyncFromParameters(forceStatusUpdate: true);
+        if (_parameterService.IsParameterDownloadInProgress)
+        {
+            StatusMessage = BuildParameterDownloadStatus();
+            return;
+        }
+
+        if (_parameterService.IsParameterDownloadComplete)
+        {
+            ScheduleSyncFromParameters(forceStatusUpdate: true);
+        }
+        else
+        {
+            StatusMessage = "Waiting for parameters...";
+        }
+    }
+
+    private void OnParameterDownloadProgressChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            UpdatePageEnabled();
+
+            if (!_connectionService.IsConnected)
+            {
+                return;
+            }
+
+            if (_parameterService.IsParameterDownloadInProgress)
+            {
+                StatusMessage = BuildParameterDownloadStatus();
+            }
+
+            if (_parameterService.IsParameterDownloadComplete)
+            {
+                ScheduleSyncFromParameters(forceStatusUpdate: true);
+            }
+        });
     }
 
     private async Task SyncFromParametersAsync(bool forceStatusUpdate, CancellationToken cancellationToken = default)
@@ -313,35 +350,52 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
             var frameClassValue = TryParseParameterValue(frameClassParam);
             var frameTypeValue = TryParseParameterValue(frameTypeParam);
 
-        await Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            _isSyncingFromParameters = true;
-            _lastFrameTypeValue = frameTypeValue;
-
-            var selectedClass = EnsureFrameClassOption(frameClassValue);
-            SelectedFrameClass = selectedClass;
-
-            BuildFrameTypeOptions(frameTypeValue);
-            SelectedFrameType = frameTypeValue.HasValue
-                ? FrameTypes.FirstOrDefault(t => t.Value == frameTypeValue.Value)
-                : null;
-
-            if (forceStatusUpdate)
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (frameClassValue.HasValue)
-                {
-                    var typeText = frameTypeValue.HasValue ? frameTypeValue.Value.ToString() : "unset";
-                    StatusMessage = $"FRAME_CLASS={frameClassValue.Value}, FRAME_TYPE={typeText}.";
-                }
-                else
-                {
-                    StatusMessage = "Waiting for parameters...";
-                }
-            }
+                _isSyncingFromParameters = true;
+                _lastFrameTypeValue = frameTypeValue;
 
-            _isSyncingFromParameters = false;
-            OnPropertyChanged(nameof(CanUpdate));
-            OnPropertyChanged(nameof(IsFrameTypeEnabled));
+                var selectedClass = EnsureFrameClassOption(frameClassValue);
+                SelectedFrameClass = selectedClass;
+
+                BuildFrameTypeOptions(frameTypeValue);
+                SelectedFrameType = frameTypeValue.HasValue
+                    ? FrameTypes.FirstOrDefault(t => t.Value == frameTypeValue.Value)
+                    : null;
+
+                UpdatePageEnabled();
+
+                if (forceStatusUpdate)
+                {
+                    if (_parameterService.IsParameterDownloadInProgress)
+                    {
+                        StatusMessage = BuildParameterDownloadStatus();
+                    }
+                    else if (frameClassValue.HasValue)
+                    {
+                        var frameClassName = SelectedFrameClass?.DisplayName ?? $"Unknown ({frameClassValue.Value})";
+                        if (SelectedFrameType != null)
+                        {
+                            StatusMessage = $"Current airframe: {frameClassName} {SelectedFrameType.DisplayName}";
+                        }
+                        else
+                        {
+                            StatusMessage = $"Current airframe: {frameClassName}";
+                        }
+                    }
+                    else if (_parameterService.IsParameterDownloadComplete)
+                    {
+                        StatusMessage = "FRAME_CLASS not available in cache.";
+                    }
+                    else
+                    {
+                        StatusMessage = "Waiting for parameters...";
+                    }
+                }
+
+                _isSyncingFromParameters = false;
+                OnPropertyChanged(nameof(CanUpdate));
+                OnPropertyChanged(nameof(IsFrameTypeEnabled));
             });
         }
         catch (OperationCanceledException)
@@ -385,6 +439,20 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         return Dispatcher.UIThread.InvokeAsync(() => _isSyncingFromParameters = false);
     }
 
+    private void UpdatePageEnabled()
+    {
+        IsPageEnabled = _connectionService.IsConnected &&
+                        (_parameterService.IsParameterDownloadComplete || SelectedFrameClass != null);
+    }
+
+    private string BuildParameterDownloadStatus()
+    {
+        var expectedText = _parameterService.ExpectedParameterCount.HasValue
+            ? _parameterService.ExpectedParameterCount.Value.ToString()
+            : "?";
+        return $"Downloading parameters… ({_parameterService.ReceivedParameterCount} / {expectedText})";
+    }
+
     private static bool IsFrameParameter(string parameterName)
     {
         return parameterName.Equals("FRAME_CLASS", StringComparison.OrdinalIgnoreCase) ||
@@ -401,6 +469,7 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         _disposed = true;
         _connectionService.ConnectionStateChanged -= OnConnectionStateChanged;
         _parameterService.ParameterUpdated -= OnParameterUpdated;
+        _parameterService.ParameterDownloadProgressChanged -= OnParameterDownloadProgressChanged;
         Task syncTask;
         lock (_scheduledSyncGate)
         {

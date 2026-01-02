@@ -83,13 +83,27 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private ObservableCollection<FrameTypeOption> _frameTypes = new();
     [ObservableProperty] private FrameClassOption? _selectedFrameClass;
     [ObservableProperty] private FrameTypeOption? _selectedFrameType;
-    [ObservableProperty] private string _statusMessage = "Waiting for parameters…";
+    [ObservableProperty] private string _statusMessage = "Connect to vehicle.";
     [ObservableProperty] private bool _isApplying;
     [ObservableProperty] private bool _isPageEnabled;
 
+    /// <summary>
+    /// Indicates whether the Frame Class dropdown should be enabled for user interaction.
+    /// True when page is enabled and not currently applying changes.
+    /// </summary>
+    public bool IsInteractionEnabled => IsPageEnabled && !IsApplying;
+
+    /// <summary>
+    /// Indicates whether the Frame Type dropdown should be enabled for user interaction.
+    /// True when IsInteractionEnabled and FrameTypes collection has options.
+    /// FrameTypes is only populated when FRAME_CLASS has a value other than 0 (Plane),
+    /// since planes don't have a frame type parameter.
+    /// </summary>
+    public bool IsFrameTypeEnabled => IsInteractionEnabled && FrameTypes.Count > 0;
+
     public bool CanUpdate =>
         IsPageEnabled &&
-        !_isApplying &&
+        !IsApplying &&
         SelectedFrameClass != null &&
         (_lastFrameType == null || SelectedFrameType != null);
 
@@ -102,6 +116,7 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         _connectionService.ConnectionStateChanged += OnConnectionStateChanged;
         _parameterService.ParameterUpdated += OnParameterUpdated;
         _parameterService.ParameterDownloadProgressChanged += OnParameterDownloadProgressChanged;
+        _parameterService.ParameterDownloadCompleted += OnParameterDownloadCompleted;
 
         UpdateAvailability();
     }
@@ -121,7 +136,9 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         }
         else if (_parameterService.IsParameterDownloadInProgress)
         {
-            StatusMessage = $"Downloading parameters… {_parameterService.ReceivedParameterCount}/{_parameterService.ExpectedParameterCount ?? 0}";
+            var expected = _parameterService.ExpectedParameterCount;
+            var expectedStr = expected.HasValue ? expected.Value.ToString() : "?";
+            Dispatcher.UIThread.Post(() => StatusMessage = $"Downloading parameters… {_parameterService.ReceivedParameterCount}/{expectedStr}");
         }
     }
 
@@ -131,6 +148,18 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
             paramName.Equals("FRAME_TYPE", StringComparison.OrdinalIgnoreCase))
         {
             Dispatcher.UIThread.Post(() => _ = SyncFromCacheAsync(false));
+        }
+    }
+
+    /// <summary>
+    /// Authoritative handler for parameter download completion.
+    /// When the full parameter set is downloaded successfully, immediately sync from cache.
+    /// </summary>
+    private void OnParameterDownloadCompleted(object? sender, bool success)
+    {
+        if (success && _parameterService.IsParameterDownloadComplete)
+        {
+            Dispatcher.UIThread.Post(() => _ = SyncFromCacheAsync(true));
         }
     }
 
@@ -175,12 +204,22 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
 
                 IsPageEnabled = true;
                 OnPropertyChanged(nameof(CanUpdate));
+                OnPropertyChanged(nameof(IsInteractionEnabled));
+                OnPropertyChanged(nameof(IsFrameTypeEnabled));
 
-                if (forceStatus && SelectedFrameClass != null)
+                // PDRL-style status messages
+                if (forceStatus)
                 {
-                    StatusMessage = SelectedFrameType != null
-                        ? $"Current airframe: {SelectedFrameClass.DisplayName} {SelectedFrameType.DisplayName}"
-                        : $"Current airframe: {SelectedFrameClass.DisplayName}";
+                    if (SelectedFrameClass != null)
+                    {
+                        StatusMessage = SelectedFrameType != null
+                            ? $"Current airframe: {SelectedFrameClass.DisplayName} {SelectedFrameType.DisplayName}"
+                            : $"Current airframe: {SelectedFrameClass.DisplayName}";
+                    }
+                    else if (classParam == null)
+                    {
+                        StatusMessage = "FRAME_CLASS not available in cache.";
+                    }
                 }
             });
         }
@@ -206,6 +245,8 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         try
         {
             IsApplying = true;
+            OnPropertyChanged(nameof(IsInteractionEnabled));
+            OnPropertyChanged(nameof(IsFrameTypeEnabled));
             StatusMessage = "Applying airframe…";
 
             if (!await _parameterService.SetParameterAsync("FRAME_CLASS", SelectedFrameClass!.Value))
@@ -229,6 +270,8 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         {
             IsApplying = false;
             OnPropertyChanged(nameof(CanUpdate));
+            OnPropertyChanged(nameof(IsInteractionEnabled));
+            OnPropertyChanged(nameof(IsFrameTypeEnabled));
         }
     }
 
@@ -261,6 +304,8 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         {
             IsPageEnabled = false;
             StatusMessage = "Connect to vehicle.";
+            OnPropertyChanged(nameof(IsInteractionEnabled));
+            OnPropertyChanged(nameof(IsFrameTypeEnabled));
             return;
         }
 
@@ -268,9 +313,15 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         {
             _ = SyncFromCacheAsync(true);
         }
+        else if (_parameterService.IsParameterDownloadInProgress)
+        {
+            var expected = _parameterService.ExpectedParameterCount;
+            var expectedStr = expected.HasValue ? expected.Value.ToString() : "?";
+            StatusMessage = $"Downloading parameters… {_parameterService.ReceivedParameterCount}/{expectedStr}";
+        }
         else
         {
-            StatusMessage = "Waiting for parameters…";
+            StatusMessage = "Waiting for parameter download…";
         }
     }
 
@@ -284,6 +335,6 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         _connectionService.ConnectionStateChanged -= OnConnectionStateChanged;
         _parameterService.ParameterUpdated -= OnParameterUpdated;
         _parameterService.ParameterDownloadProgressChanged -= OnParameterDownloadProgressChanged;
+        _parameterService.ParameterDownloadCompleted -= OnParameterDownloadCompleted;
     }
 }
-        

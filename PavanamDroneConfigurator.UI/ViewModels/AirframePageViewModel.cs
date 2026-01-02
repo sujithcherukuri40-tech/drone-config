@@ -475,7 +475,7 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         {
             var baseException = t.Exception?.GetBaseException();
             Debug.WriteLine($"Airframe sync error: {baseException}");
-            Dispatcher.UIThread.InvokeAsync(() => StatusMessage = "Unable to sync frame parameters. Please try again.");
+            Dispatcher.UIThread.InvokeAsync(() => StatusMessage = "Unable to sync frame parameters. Check connection and parameter download, then retry.");
         }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 

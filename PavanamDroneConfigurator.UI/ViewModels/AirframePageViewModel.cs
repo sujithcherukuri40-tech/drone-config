@@ -337,18 +337,4 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         _parameterService.ParameterDownloadProgressChanged -= OnParameterDownloadProgressChanged;
         _parameterService.ParameterDownloadCompleted -= OnParameterDownloadCompleted;
     }
-<<<<<<< HEAD
 }
-=======
-    public bool IsInteractionEnabled => IsPageEnabled && !IsApplying;
-
-    public bool IsFrameTypeEnabled =>
-        IsInteractionEnabled &&
-        SelectedFrameClass != null &&
-        FrameTypes.Count > 0;
-
-}
-        
-
-        
->>>>>>> d71c6b1 (fixes)

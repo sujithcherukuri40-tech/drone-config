@@ -125,8 +125,8 @@ public class ParameterService : IParameterService
             await SendParameterSetAsync(name, value);
             
             // Wait for the parameter to be updated (indicated by receiving PARAM_VALUE)
-            bool receivedUpdate = await VerifyParameterValueAsync(name, value, EepromWriteTimeoutMs, 
-                "Successfully set parameter", false);
+            bool receivedUpdate = await WaitForParameterUpdateAsync(name, value, EepromWriteTimeoutMs, 
+                "Successfully set parameter");
             
             if (!receivedUpdate)
             {
@@ -137,8 +137,8 @@ public class ParameterService : IParameterService
                 _parameters.TryRemove(name, out _);
                 await RequestParameterReadAsync(name);
                 
-                bool verified = await VerifyParameterValueAsync(name, value, VerificationTimeoutMs,
-                    "Parameter verified by re-reading from drone", true);
+                bool verified = await VerifyParameterMatchesAsync(name, value, VerificationTimeoutMs,
+                    "Parameter verified by re-reading from drone");
                 
                 if (!verified)
                 {
@@ -154,8 +154,8 @@ public class ParameterService : IParameterService
             
             await RequestParameterReadAsync(name);
             
-            bool finalVerified = await VerifyParameterValueAsync(name, value, VerificationTimeoutMs,
-                "Parameter CONFIRMED persisted on drone", true);
+            bool finalVerified = await VerifyParameterMatchesAsync(name, value, VerificationTimeoutMs,
+                "Parameter CONFIRMED persisted on drone");
             
             return finalVerified;
         }
@@ -166,8 +166,13 @@ public class ParameterService : IParameterService
         }
     }
 
-    private async Task<bool> VerifyParameterValueAsync(string name, float expectedValue, int timeoutMs, 
-        string successMessage, bool logError)
+    /// <summary>
+    /// Waits for a parameter to be updated to the expected value.
+    /// Continues waiting until timeout even if mismatched values are received.
+    /// Used after sending PARAM_SET to wait for the drone to respond.
+    /// </summary>
+    private async Task<bool> WaitForParameterUpdateAsync(string name, float expectedValue, int timeoutMs, 
+        string successMessage)
     {
         var startTime = DateTime.UtcNow;
         var timeout = TimeSpan.FromMilliseconds(timeoutMs);
@@ -187,8 +192,42 @@ public class ParameterService : IParameterService
                     _logger.LogInformation("✓ {Message}: {Name} = {Value}", successMessage, name, expectedValue);
                     return true;
                 }
-                else if (logError)
+                // Continue waiting - the drone might still be processing the update
+            }
+        }
+        
+        return false;
+    }
+
+    /// <summary>
+    /// Verifies that a parameter matches the expected value.
+    /// Returns false immediately if a mismatched value is received.
+    /// Used after explicitly requesting a parameter to verify it was persisted correctly.
+    /// </summary>
+    private async Task<bool> VerifyParameterMatchesAsync(string name, float expectedValue, int timeoutMs, 
+        string successMessage)
+    {
+        var startTime = DateTime.UtcNow;
+        var timeout = TimeSpan.FromMilliseconds(timeoutMs);
+        
+        while ((DateTime.UtcNow - startTime) < timeout)
+        {
+            await Task.Delay(100);
+            
+            if (_parameters.TryGetValue(name, out var param))
+            {
+                _logger.LogDebug("Verifying parameter {Name}: current={CurrentValue}, expected={ExpectedValue}", 
+                    name, param.Value, expectedValue);
+                
+                // Allow small floating point differences
+                if (Math.Abs(param.Value - expectedValue) < 0.001f)
                 {
+                    _logger.LogInformation("✓ {Message}: {Name} = {Value}", successMessage, name, expectedValue);
+                    return true;
+                }
+                else
+                {
+                    // Mismatch detected - parameter was not persisted correctly
                     _logger.LogError("❌ Parameter {Name} verification failed: expected {Expected}, got {Actual}", 
                         name, expectedValue, param.Value);
                     return false;

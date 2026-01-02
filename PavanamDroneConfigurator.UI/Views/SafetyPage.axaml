@@ -1,10 +1,416 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:PavanamDroneConfigurator.UI.ViewModels"
+             xmlns:enums="using:PavanamDroneConfigurator.Core.Enums"
              x:Class="PavanamDroneConfigurator.UI.Views.SafetyPage"
              x:DataType="vm:SafetyPageViewModel">
 
     <ScrollViewer>
+        <StackPanel Margin="20" Spacing="15">
+            <!-- Header -->
+            <TextBlock Text="Safety Configuration" FontSize="24" FontWeight="Bold" />
+            
+            <!-- Action Buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Content="Load Settings" 
+                        Command="{Binding LoadSettingsCommand}" 
+                        IsEnabled="{Binding IsConnected}"
+                        Width="120" />
+                <Button Content="Apply Settings" 
+                        Command="{Binding ApplySettingsCommand}" 
+                        IsEnabled="{Binding IsConnected}"
+                        Width="120" />
+                <Button Content="Refresh" 
+                        Command="{Binding RefreshSettingsCommand}" 
+                        IsEnabled="{Binding IsConnected}"
+                        Width="120" />
+            </StackPanel>
+            
+            <!-- Status Message -->
+            <TextBlock Text="{Binding StatusMessage}" 
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource SystemAccentColor}" />
+            
+            <!-- Loading Indicator -->
+            <ProgressBar IsIndeterminate="True" 
+                         IsVisible="{Binding IsLoading}"
+                         Height="4" />
+
+            <!-- Main Content -->
+            <StackPanel Spacing="20" IsEnabled="{Binding IsConnected}">
+                
+                <!-- 1. BATTERY FAILSAFE -->
+                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" 
+                        BorderThickness="1" 
+                        CornerRadius="8" 
+                        Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Battery Failsafe" 
+                                   FontSize="18" 
+                                   FontWeight="Bold" />
+                        
+                        <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+                            <!-- Battery Monitor -->
+                            <TextBlock Grid.Row="0" Grid.Column="0" 
+                                       Text="Battery Monitor:" 
+                                       VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="1" 
+                                           Value="{Binding BattMonitor}" 
+                                           Increment="1" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="10" />
+                            
+                            <!-- Low Voltage -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" 
+                                       Text="Low Voltage (V):" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" 
+                                           Value="{Binding BattLowVolt}" 
+                                           Increment="0.1" 
+                                           FormatString="F1" 
+                                           Minimum="0" 
+                                           Maximum="50"
+                                           Margin="0,5,0,0" />
+                            
+                            <!-- Critical Voltage -->
+                            <TextBlock Grid.Row="2" Grid.Column="0" 
+                                       Text="Critical Voltage (V):" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <NumericUpDown Grid.Row="2" Grid.Column="1" 
+                                           Value="{Binding BattCrtVolt}" 
+                                           Increment="0.1" 
+                                           FormatString="F1" 
+                                           Minimum="0" 
+                                           Maximum="50"
+                                           Margin="0,5,0,0" />
+                            
+                            <!-- Low Action -->
+                            <TextBlock Grid.Row="3" Grid.Column="0" 
+                                       Text="Low Voltage Action:" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <ComboBox Grid.Row="3" Grid.Column="1" 
+                                      SelectedItem="{Binding BattFsLowAct}" 
+                                      ItemsSource="{Binding AvailableFailsafeActions}"
+                                      Margin="0,5,0,0" />
+                            
+                            <!-- Critical Action -->
+                            <TextBlock Grid.Row="4" Grid.Column="0" 
+                                       Text="Critical Voltage Action:" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <ComboBox Grid.Row="4" Grid.Column="1" 
+                                      SelectedItem="{Binding BattFsCrtAct}" 
+                                      ItemsSource="{Binding AvailableFailsafeActions}"
+                                      Margin="0,5,0,0" />
+                            
+                            <!-- Capacity -->
+                            <TextBlock Grid.Row="5" Grid.Column="0" 
+                                       Text="Battery Capacity (mAh):" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <NumericUpDown Grid.Row="5" Grid.Column="1" 
+                                           Value="{Binding BattCapacity}" 
+                                           Increment="100" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="100000"
+                                           Margin="0,5,0,0" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 2. RC FAILSAFE -->
+                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" 
+                        BorderThickness="1" 
+                        CornerRadius="8" 
+                        Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="RC Failsafe" 
+                                   FontSize="18" 
+                                   FontWeight="Bold" />
+                        
+                        <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto,Auto">
+                            <!-- Enable -->
+                            <TextBlock Grid.Row="0" Grid.Column="0" 
+                                       Text="Enable:" 
+                                       VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="1" 
+                                           Value="{Binding FsThrEnable}" 
+                                           Increment="1" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="2" />
+                            
+                            <!-- PWM Value -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" 
+                                       Text="PWM Value:" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" 
+                                           Value="{Binding FsThrValue}" 
+                                           Increment="10" 
+                                           FormatString="F0" 
+                                           Minimum="800" 
+                                           Maximum="2200"
+                                           Margin="0,5,0,0" />
+                            
+                            <!-- Action -->
+                            <TextBlock Grid.Row="2" Grid.Column="0" 
+                                       Text="Action:" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <ComboBox Grid.Row="2" Grid.Column="1" 
+                                      SelectedItem="{Binding FsThrAction}" 
+                                      ItemsSource="{Binding AvailableFailsafeActions}"
+                                      Margin="0,5,0,0" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 3. GCS FAILSAFE -->
+                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" 
+                        BorderThickness="1" 
+                        CornerRadius="8" 
+                        Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="GCS Failsafe" 
+                                   FontSize="18" 
+                                   FontWeight="Bold" />
+                        
+                        <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto,Auto">
+                            <!-- Enable -->
+                            <TextBlock Grid.Row="0" Grid.Column="0" 
+                                       Text="Enable:" 
+                                       VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="1" 
+                                           Value="{Binding FsGcsEnable}" 
+                                           Increment="1" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="1" />
+                            
+                            <!-- Timeout -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" 
+                                       Text="Timeout (seconds):" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" 
+                                           Value="{Binding FsGcsTimeout}" 
+                                           Increment="1" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="60"
+                                           Margin="0,5,0,0" />
+                            
+                            <!-- Action -->
+                            <TextBlock Grid.Row="2" Grid.Column="0" 
+                                       Text="Action:" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <ComboBox Grid.Row="2" Grid.Column="1" 
+                                      SelectedItem="{Binding FsGcsAction}" 
+                                      ItemsSource="{Binding AvailableFailsafeActions}"
+                                      Margin="0,5,0,0" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 4. CRASH / LAND SAFETY -->
+                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" 
+                        BorderThickness="1" 
+                        CornerRadius="8" 
+                        Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Crash / Land Detection" 
+                                   FontSize="18" 
+                                   FontWeight="Bold" />
+                        
+                        <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto,Auto">
+                            <!-- Crash Detect -->
+                            <TextBlock Grid.Row="0" Grid.Column="0" 
+                                       Text="Crash Detect:" 
+                                       VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="1" 
+                                           Value="{Binding CrashDetect}" 
+                                           Increment="1" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="1" />
+                            
+                            <!-- Crash Action -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" 
+                                       Text="Crash Action:" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <ComboBox Grid.Row="1" Grid.Column="1" 
+                                      SelectedItem="{Binding CrashAction}" 
+                                      ItemsSource="{Binding AvailableFailsafeActions}"
+                                      Margin="0,5,0,0" />
+                            
+                            <!-- Land Detect -->
+                            <TextBlock Grid.Row="2" Grid.Column="0" 
+                                       Text="Land Detect:" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <NumericUpDown Grid.Row="2" Grid.Column="1" 
+                                           Value="{Binding LandDetect}" 
+                                           Increment="1" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="2"
+                                           Margin="0,5,0,0" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 5. ARMING CHECKS -->
+                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" 
+                        BorderThickness="1" 
+                        CornerRadius="8" 
+                        Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Arming Checks" 
+                                   FontSize="18" 
+                                   FontWeight="Bold" />
+                        
+                        <TextBlock Text="Enable/Disable individual pre-arm checks:" 
+                                   FontStyle="Italic" 
+                                   Opacity="0.7" />
+                        
+                        <StackPanel Spacing="5">
+                            <CheckBox Content="GPS Check" 
+                                      IsChecked="{Binding ArmingCheckGps}" />
+                            <CheckBox Content="Compass Check" 
+                                      IsChecked="{Binding ArmingCheckCompass}" />
+                            <CheckBox Content="INS Check" 
+                                      IsChecked="{Binding ArmingCheckIns}" />
+                            <CheckBox Content="Battery Check" 
+                                      IsChecked="{Binding ArmingCheckBattery}" />
+                            <CheckBox Content="RC Check" 
+                                      IsChecked="{Binding ArmingCheckRc}" />
+                            <CheckBox Content="EKF Check" 
+                                      IsChecked="{Binding ArmingCheckEkf}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- 6. GEO-FENCE -->
+                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" 
+                        BorderThickness="1" 
+                        CornerRadius="8" 
+                        Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Geo-Fence" 
+                                   FontSize="18" 
+                                   FontWeight="Bold" />
+                        
+                        <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                            <!-- Enable -->
+                            <TextBlock Grid.Row="0" Grid.Column="0" 
+                                       Text="Enable:" 
+                                       VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="1" 
+                                           Value="{Binding FenceEnable}" 
+                                           Increment="1" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="1" />
+                            
+                            <!-- Type -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" 
+                                       Text="Type (Bitmask):" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" 
+                                           Value="{Binding FenceType}" 
+                                           Increment="1" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="15"
+                                           Margin="0,5,0,0" />
+                            
+                            <!-- Max Altitude -->
+                            <TextBlock Grid.Row="2" Grid.Column="0" 
+                                       Text="Max Altitude (m):" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <NumericUpDown Grid.Row="2" Grid.Column="1" 
+                                           Value="{Binding FenceAltMax}" 
+                                           Increment="10" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="1000"
+                                           Margin="0,5,0,0" />
+                            
+                            <!-- Radius -->
+                            <TextBlock Grid.Row="3" Grid.Column="0" 
+                                       Text="Radius (m):" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <NumericUpDown Grid.Row="3" Grid.Column="1" 
+                                           Value="{Binding FenceRadius}" 
+                                           Increment="10" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="10000"
+                                           Margin="0,5,0,0" />
+                            
+                            <!-- Action -->
+                            <TextBlock Grid.Row="4" Grid.Column="0" 
+                                       Text="Breach Action:" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <ComboBox Grid.Row="4" Grid.Column="1" 
+                                      SelectedItem="{Binding FenceAction}" 
+                                      ItemsSource="{Binding AvailableFailsafeActions}"
+                                      Margin="0,5,0,0" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 7. MOTOR SAFETY -->
+                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" 
+                        BorderThickness="1" 
+                        CornerRadius="8" 
+                        Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Motor Safety" 
+                                   FontSize="18" 
+                                   FontWeight="Bold" />
+                        
+                        <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto">
+                            <!-- Safe Disarm -->
+                            <TextBlock Grid.Row="0" Grid.Column="0" 
+                                       Text="Safe Disarm (seconds):" 
+                                       VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="1" 
+                                           Value="{Binding MotSafeDisarm}" 
+                                           Increment="0.5" 
+                                           FormatString="F1" 
+                                           Minimum="0" 
+                                           Maximum="60" />
+                            
+                            <!-- Emergency Stop -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" 
+                                       Text="Emergency Stop:" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,5,0,0" />
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" 
+                                           Value="{Binding MotEmergencyStop}" 
+                                           Increment="1" 
+                                           FormatString="F0" 
+                                           Minimum="0" 
+                                           Maximum="1"
+                                           Margin="0,5,0,0" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
         <StackPanel Margin="20" Spacing="16">
             <TextBlock Text="Safety" FontSize="24" FontWeight="Bold" />
             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">

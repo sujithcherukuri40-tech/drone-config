@@ -8,6 +8,12 @@ public interface IParameterService
     Task<DroneParameter?> GetParameterAsync(string name);
     Task<bool> SetParameterAsync(string name, float value);
     Task RefreshParametersAsync();
+    
+    // Method to be called when PARAM_VALUE messages are received
+    void OnParameterValueReceived(string name, float value, int index, int count);
+    
+    // Event fired when a parameter is updated
+    event EventHandler<DroneParameter>? ParameterUpdated;
     event EventHandler? ParameterListRequested;
     event EventHandler<ParameterWriteRequest>? ParameterWriteRequested;
     event EventHandler<ParameterReadRequest>? ParameterReadRequested;

@@ -15,6 +15,7 @@ namespace PavanamDroneConfigurator.UI.ViewModels;
 public partial class ConnectionPageViewModel : ViewModelBase
 {
     private readonly IConnectionService _connectionService;
+    private readonly ITelemetryService _telemetryService;
     private readonly IParameterService _parameterService;
     private bool _downloadInProgress;
 
@@ -50,6 +51,10 @@ public partial class ConnectionPageViewModel : ViewModelBase
 
     public ConnectionPageViewModel(
         IConnectionService connectionService, 
+        ITelemetryService telemetryService)
+    {
+        _connectionService = connectionService;
+        _telemetryService = telemetryService;
         IParameterService parameterService)
     {
         _connectionService = connectionService;
@@ -86,7 +91,7 @@ public partial class ConnectionPageViewModel : ViewModelBase
         });
     }
 
-    private async void OnConnectionStateChanged(object? sender, bool connected)
+    private void OnConnectionStateChanged(object? sender, bool connected)
     {
         try
         {
@@ -96,6 +101,8 @@ public partial class ConnectionPageViewModel : ViewModelBase
 
             if (connected)
             {
+                // Start telemetry when connected
+                _telemetryService.Start();
                 _downloadInProgress = true;
                 StatusMessage = "Connected - Downloading parameters...";
             }
@@ -111,7 +118,6 @@ public partial class ConnectionPageViewModel : ViewModelBase
         catch (Exception ex)
         {
             StatusMessage = $"Error during connection state change: {ex.Message}";
-            // In production, this should be logged via ILogger
         }
     }
 

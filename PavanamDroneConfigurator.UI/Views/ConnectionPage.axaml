@@ -7,30 +7,49 @@
              x:Class="PavanamDroneConfigurator.UI.Views.ConnectionPage"
              x:DataType="vm:ConnectionPageViewModel">
 
-    <ScrollViewer>
-        <StackPanel Margin="20" Spacing="15">
-            <TextBlock Text="Connection Settings" FontSize="24" FontWeight="Bold" />
+    <UserControl.Styles>
+        <Style Selector="TextBlock.section-header">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+        
+        <Style Selector="Border.section">
+            <Setter Property="BorderBrush" Value="#E0E0E0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="15"/>
+            <Setter Property="Background" Value="White"/>
+        </Style>
+    </UserControl.Styles>
 
-            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                <Ellipse Width="14" Height="14" Fill="{Binding ConnectionStatusBrush}" Stroke="Black" StrokeThickness="1"/>
-                <TextBlock Text="{Binding ConnectionStatusText}" FontSize="16" FontWeight="Bold" />
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="20" MaxWidth="700">
+            <TextBlock Text="Connection Settings" FontSize="28" FontWeight="Bold" />
+
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <Ellipse Width="16" Height="16" Fill="{Binding ConnectionStatusBrush}" Stroke="#333" StrokeThickness="2"/>
+                <TextBlock Text="{Binding ConnectionStatusText}" FontSize="18" FontWeight="Bold" />
             </StackPanel>
 
             <StackPanel Spacing="10">
-                <TextBlock Text="Connection Type:" />
-                <ComboBox SelectedIndex="{Binding ConnectionType}" IsEnabled="{Binding !IsConnected}">
-                    <ComboBoxItem Content="Serial" />
-                    <ComboBoxItem Content="TCP" />
+                <TextBlock Text="Connection Type" FontSize="14" FontWeight="SemiBold" />
+                <ComboBox SelectedIndex="{Binding ConnectionType}" IsEnabled="{Binding !IsConnected}" HorizontalAlignment="Stretch">
+                    <ComboBoxItem Content="Serial (USB)" />
+                    <ComboBoxItem Content="TCP (Network)" />
                 </ComboBox>
             </StackPanel>
 
             <!-- Serial Settings -->
-            <Border BorderBrush="LightGray" BorderThickness="1" Padding="10" Margin="0,10,0,0">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Serial Connection Settings" FontWeight="Bold" />
-                    <StackPanel Spacing="5">
-                        <TextBlock Text="Port Name:" />
+            <Border Classes="section">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Serial Connection Settings" Classes="section-header" />
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Port Name" FontWeight="SemiBold" />
                         <ComboBox ItemsSource="{Binding AvailableSerialPorts}"
+                                  SelectedItem="{Binding SelectedPortName}"
+                                  IsEnabled="{Binding !IsConnected}"
+                                  HorizontalAlignment="Stretch" />
                                   SelectedItem="{Binding SelectedSerialPort}"
                                   IsEnabled="{Binding !IsConnected}">
                             <ComboBox.ItemTemplate>
@@ -40,33 +59,69 @@
                             </ComboBox.ItemTemplate>
                         </ComboBox>
                     </StackPanel>
-                    <StackPanel Spacing="5">
-                        <TextBlock Text="Baud Rate:" />
-                        <TextBox Text="{Binding BaudRate}" IsEnabled="{Binding !IsConnected}" />
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Baud Rate" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding BaudRate}" IsEnabled="{Binding !IsConnected}" Watermark="e.g., 115200" />
                     </StackPanel>
                 </StackPanel>
             </Border>
 
             <!-- TCP Settings -->
-            <Border BorderBrush="LightGray" BorderThickness="1" Padding="10" Margin="0,10,0,0">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="TCP Connection Settings" FontWeight="Bold" />
-                    <StackPanel Spacing="5">
-                        <TextBlock Text="IP Address:" />
-                        <TextBox Text="{Binding IpAddress}" IsEnabled="{Binding !IsConnected}" />
+            <Border Classes="section">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="TCP Connection Settings" Classes="section-header" />
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="IP Address" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding IpAddress}" IsEnabled="{Binding !IsConnected}" Watermark="e.g., 192.168.1.100" />
                     </StackPanel>
-                    <StackPanel Spacing="5">
-                        <TextBlock Text="TCP Port:" />
-                        <TextBox Text="{Binding TcpPort}" IsEnabled="{Binding !IsConnected}" />
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="TCP Port" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding TcpPort}" IsEnabled="{Binding !IsConnected}" Watermark="e.g., 5760" />
                     </StackPanel>
                 </StackPanel>
             </Border>
 
-            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
-                <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding !IsConnected}" />
-                <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}" />
+            <StackPanel Orientation="Horizontal" Spacing="15" Margin="0,10,0,0">
+                <Button Content="Connect" 
+                        Command="{Binding ConnectCommand}" 
+                        IsEnabled="{Binding !IsConnected}"
+                        Padding="25,10"
+                        FontSize="16"
+                        FontWeight="SemiBold" />
+                <Button Content="Disconnect" 
+                        Command="{Binding DisconnectCommand}" 
+                        IsEnabled="{Binding IsConnected}"
+                        Padding="25,10"
+                        FontSize="16"
+                        FontWeight="SemiBold" />
             </StackPanel>
 
+            <TextBlock Text="{Binding StatusMessage}" FontWeight="SemiBold" FontSize="14" Foreground="#666" />
+
+            <Border BorderBrush="#E0E0E0" 
+                    BorderThickness="1" 
+                    CornerRadius="8"
+                    Padding="15" 
+                    Background="White"
+                    Margin="0,10,0,0" 
+                    IsVisible="{Binding IsConnected}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Telemetry Data" FontSize="18" FontWeight="Bold" Margin="0,0,0,10" />
+                    <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Flight Mode:" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CurrentTelemetry.FlightMode}" />
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Armed:" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CurrentTelemetry.Armed}" />
+                        
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Battery:" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CurrentTelemetry.BatteryVoltage, StringFormat='{}{0:F2}V'}" />
+                        
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Satellites:" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CurrentTelemetry.SatelliteCount}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
             <TextBlock Text="{Binding StatusMessage}" FontWeight="Bold" />
         </StackPanel>
     </ScrollViewer>

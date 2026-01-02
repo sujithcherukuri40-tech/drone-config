@@ -188,17 +188,23 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
         if (param == null) return;
 
         var mask = (int)Math.Round(param.Value);
-        var all = (mask & ArmingAllBit) == ArmingAllBit;
+        var accel = (mask & ArmingAccelerometerBit) != 0;
+        var compass = (mask & ArmingCompassBit) != 0;
+        var gps = (mask & ArmingGpsBit) != 0;
+        var barometer = (mask & ArmingBarometerBit) != 0;
+        var rc = (mask & ArmingRcBit) != 0;
+        var ins = (mask & ArmingInsBit) != 0;
+        var all = (mask & ArmingAllBit) == ArmingAllBit || (accel && compass && gps && barometer && rc && ins);
 
         _isSyncing = true;
         try
         {
-            AccelerometerCheck = all || (mask & ArmingAccelerometerBit) != 0;
-            CompassCheck = all || (mask & ArmingCompassBit) != 0;
-            GpsCheck = all || (mask & ArmingGpsBit) != 0;
-            BarometerCheck = all || (mask & ArmingBarometerBit) != 0;
-            RcCheck = all || (mask & ArmingRcBit) != 0;
-            InsCheck = all || (mask & ArmingInsBit) != 0;
+            AccelerometerCheck = all || accel;
+            CompassCheck = all || compass;
+            GpsCheck = all || gps;
+            BarometerCheck = all || barometer;
+            RcCheck = all || rc;
+            InsCheck = all || ins;
         }
         finally
         {
@@ -332,7 +338,13 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
     {
         if (AccelerometerCheck && CompassCheck && GpsCheck && BarometerCheck && RcCheck && InsCheck)
         {
-            return ArmingAllBit;
+            return ArmingAllBit
+                   | ArmingAccelerometerBit
+                   | ArmingCompassBit
+                   | ArmingGpsBit
+                   | ArmingBarometerBit
+                   | ArmingRcBit
+                   | ArmingInsBit;
         }
 
         var mask = 0;
@@ -428,7 +440,7 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
                 if (!actionSuccess)
                 {
                     StatusMessage = "Fence action update failed; reverting fence enable.";
-                    var rollback = await WriteParameterAsync(FenceEnableParam, previousEnable ?? 0f);
+                    var rollback = await WriteParameterAsync(FenceEnableParam, (float)(previousEnable ?? 0));
                     if (!rollback)
                     {
                         StatusMessage = "Fence action update failed and fence enable rollback failed.";

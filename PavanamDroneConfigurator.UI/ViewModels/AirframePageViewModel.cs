@@ -309,7 +309,7 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
 
     private void OnParameterDownloadProgressChanged(object? sender, EventArgs e)
     {
-        Dispatcher.UIThread.Post(async () =>
+        Dispatcher.UIThread.InvokeAsync(async () =>
         {
             await UpdatePageEnabledAsync();
 
@@ -370,8 +370,7 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
                     ? FrameTypes.FirstOrDefault(t => t.Value == frameTypeValue.Value)
                     : null;
 
-                IsPageEnabled = _connectionService.IsConnected &&
-                                (_parameterService.IsParameterDownloadComplete || frameClassValue.HasValue);
+                ApplyPageEnabled(frameClassValue.HasValue);
 
                 if (forceStatusUpdate)
                 {
@@ -449,11 +448,8 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
 
     private async Task UpdatePageEnabledAsync()
     {
-        var frameClassParam = await _parameterService.GetParameterAsync("FRAME_CLASS");
-        var hasCachedFrameClass = TryParseParameterValue(frameClassParam).HasValue;
-
-        IsPageEnabled = _connectionService.IsConnected &&
-                        (_parameterService.IsParameterDownloadComplete || hasCachedFrameClass);
+        var (frameClass, _) = await GetCachedFrameParametersAsync();
+        ApplyPageEnabled(frameClass.HasValue);
     }
 
     private string BuildParameterDownloadStatus()
@@ -470,6 +466,12 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         var cachedFrameType = await _parameterService.GetParameterAsync("FRAME_TYPE");
 
         return (TryParseParameterValue(cachedFrameClass), TryParseParameterValue(cachedFrameType));
+    }
+
+    private void ApplyPageEnabled(bool hasCachedFrameClass)
+    {
+        IsPageEnabled = _connectionService.IsConnected &&
+                        (_parameterService.IsParameterDownloadComplete || hasCachedFrameClass);
     }
 
     private static bool IsFrameParameter(string parameterName)

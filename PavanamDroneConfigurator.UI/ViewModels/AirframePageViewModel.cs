@@ -314,7 +314,6 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
             {
                 StatusMessage = BuildParameterDownloadStatus();
             }
-
             else if (_parameterService.IsParameterDownloadComplete)
             {
                 ScheduleSyncFromParameters(forceStatusUpdate: true);

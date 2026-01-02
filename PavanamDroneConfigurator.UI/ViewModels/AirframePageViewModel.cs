@@ -311,7 +311,17 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
 
     private void OnParameterDownloadProgressChanged(object? sender, EventArgs e)
     {
-        Dispatcher.UIThread.Post(() => SafeFireAndForget(UpdateAvailabilityAsync()));
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_parameterService.IsParameterDownloadComplete)
+            {
+                SafeFireAndForget(UpdateAvailabilityAsync());
+            }
+            else if (_parameterService.IsParameterDownloadInProgress)
+            {
+                StatusMessage = BuildParameterDownloadStatus();
+            }
+        });
     }
 
     private async Task SyncFromParametersAsync(bool forceStatusUpdate, CancellationToken cancellationToken = default)
@@ -466,7 +476,7 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
             var baseException = t.Exception?.GetBaseException();
             Debug.WriteLine($"Airframe sync error: {baseException}");
             Dispatcher.UIThread.InvokeAsync(() => StatusMessage = "Unable to sync frame parameters. Please try again.");
-        }, TaskContinuationOptions.OnlyOnFaulted);
+        }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 
     private static bool IsFrameParameter(string parameterName)

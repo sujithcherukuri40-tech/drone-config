@@ -19,12 +19,7 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
     private bool _isSyncing;
     private bool _disposed;
 
-    private int? _armingCached;
-    private int? _battLowCached;
-    private int? _battCriticalCached;
-    private int? _rcFailsafeCached;
     private int? _fenceEnableCached;
-    private int? _fenceActionCached;
 
     private const string ArmingParam = "ARMING_CHECK";
     private const string BattLowParam = "BATT_FS_LOW_ACT";
@@ -192,8 +187,6 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
         if (param == null) return;
 
         var mask = (int)Math.Round(param.Value);
-        _armingCached = mask;
-
         var all = (mask & ArmingAllBit) == ArmingAllBit;
 
         _isSyncing = true;
@@ -218,8 +211,6 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
         if (param == null) return;
 
         var value = (int)Math.Round(param.Value);
-        _battLowCached = value;
-
         _isSyncing = true;
         try
         {
@@ -237,8 +228,6 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
         if (param == null) return;
 
         var value = (int)Math.Round(param.Value);
-        _battCriticalCached = value;
-
         _isSyncing = true;
         try
         {
@@ -256,8 +245,6 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
         if (param == null) return;
 
         var value = (int)Math.Round(param.Value);
-        _rcFailsafeCached = value;
-
         _isSyncing = true;
         try
         {
@@ -294,8 +281,6 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
         if (param == null) return;
 
         var value = (int)Math.Round(param.Value);
-        _fenceActionCached = value;
-
         _isSyncing = true;
         try
         {
@@ -337,7 +322,6 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                _armingCached = mask;
                 StatusMessage = "Arming checks updated.";
             }
         });
@@ -375,7 +359,6 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                _battLowCached = option.Value;
                 StatusMessage = "Battery low failsafe updated.";
             }
         });
@@ -395,7 +378,6 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                _battCriticalCached = option.Value;
                 StatusMessage = "Battery critical failsafe updated.";
             }
         });
@@ -415,7 +397,6 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                _rcFailsafeCached = option.Value;
                 StatusMessage = "RC failsafe updated.";
             }
         });
@@ -471,7 +452,6 @@ public sealed partial class SafetyPageViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                _fenceActionCached = option.Value;
                 StatusMessage = "Fence action updated.";
             }
         });

@@ -27,6 +27,24 @@
                 <Button Content="Profiles" CommandParameter="{Binding ProfilePage}" Click="NavButton_Click" />
             </StackPanel>
         </Border>
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
+        x:Class="PavanamDroneConfigurator.UI.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Pavanam Drone Configurator"
+        Width="1200" Height="700">
+
+    <Grid ColumnDefinitions="200,*">
+        <!-- Navigation Sidebar -->
+        <Border Grid.Column="0" Background="#2C3E50" Padding="10">
+            <StackPanel Spacing="5">
+                <Button Content="Connection" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ConnectionPage}" CommandParameter="{Binding ConnectionPage}" Click="NavButton_Click" />
+                <Button Content="Airframe" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).AirframePage}" CommandParameter="{Binding AirframePage}" Click="NavButton_Click" IsEnabled="{Binding CanAccessAirframe}" />
+                <Button Content="Parameters" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ParametersPage}" CommandParameter="{Binding ParametersPage}" Click="NavButton_Click" IsEnabled="{Binding CanAccessParameters}" />
+                <Button Content="Calibration" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CalibrationPage}" CommandParameter="{Binding CalibrationPage}" Click="NavButton_Click" />
+                <Button Content="Safety" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SafetyPage}" CommandParameter="{Binding SafetyPage}" Click="NavButton_Click" />
+                <Button Content="Profiles" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ProfilePage}" CommandParameter="{Binding ProfilePage}" Click="NavButton_Click" />
+            </StackPanel>
+        </Border>
 
         <!-- Content Area -->
         <ContentControl Grid.Column="1" Content="{Binding CurrentPage}">
@@ -34,11 +52,11 @@
                 <DataTemplate DataType="vm:ConnectionPageViewModel">
                     <views:ConnectionPage />
                 </DataTemplate>
-                <DataTemplate DataType="vm:TelemetryPageViewModel">
-                    <views:TelemetryPage />
-                </DataTemplate>
                 <DataTemplate DataType="vm:ParametersPageViewModel">
                     <views:ParametersPage />
+                </DataTemplate>
+                <DataTemplate DataType="vm:AirframePageViewModel">
+                    <views:AirframePage />
                 </DataTemplate>
                 <DataTemplate DataType="vm:CalibrationPageViewModel">
                     <views:CalibrationPage />
@@ -54,6 +72,19 @@
                 </DataTemplate>
             </ContentControl.DataTemplates>
         </ContentControl>
+
+        <!-- Modal overlay for parameter download -->
+        <Border Grid.ColumnSpan="2"
+                Background="#80000000"
+                IsVisible="{Binding IsParameterDownloadInProgress}"
+                IsHitTestVisible="{Binding IsParameterDownloadInProgress}">
+            <Border Background="White" Padding="20" CornerRadius="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel Spacing="10" HorizontalAlignment="Center">
+                    <TextBlock Text="Downloading parameters from vehicle..." FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding ParameterDownloadStatusText}" FontSize="14" HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 
 </Window>

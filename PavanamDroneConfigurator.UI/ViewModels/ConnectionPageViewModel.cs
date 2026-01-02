@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -15,12 +16,14 @@ public partial class ConnectionPageViewModel : ViewModelBase
 {
     private readonly IConnectionService _connectionService;
     private readonly ITelemetryService _telemetryService;
+    private readonly IParameterService _parameterService;
+    private bool _downloadInProgress;
 
     [ObservableProperty]
-    private ObservableCollection<string> _availableSerialPorts = new();
+    private ObservableCollection<SerialPortInfo> _availableSerialPorts = new();
 
     [ObservableProperty]
-    private string _selectedPortName = "COM3";
+    private SerialPortInfo? _selectedSerialPort;
 
     [ObservableProperty]
     private int _baudRate = 115200;
@@ -46,33 +49,31 @@ public partial class ConnectionPageViewModel : ViewModelBase
     [ObservableProperty]
     private IBrush _connectionStatusBrush = Brushes.Red;
 
-    [ObservableProperty]
-    private TelemetryData? _currentTelemetry;
-
     public ConnectionPageViewModel(
         IConnectionService connectionService, 
         ITelemetryService telemetryService)
     {
         _connectionService = connectionService;
         _telemetryService = telemetryService;
+        IParameterService parameterService)
+    {
+        _connectionService = connectionService;
+        _parameterService = parameterService;
 
         _connectionService.ConnectionStateChanged += OnConnectionStateChanged;
         _connectionService.AvailableSerialPortsChanged += OnAvailableSerialPortsChanged;
+        _parameterService.ParameterDownloadProgressChanged += OnParameterDownloadProgressChanged;
+        _downloadInProgress = _parameterService.IsParameterDownloadInProgress;
 
         var ports = _connectionService.GetAvailableSerialPorts().ToList();
-        AvailableSerialPorts = new ObservableCollection<string>(ports);
+        AvailableSerialPorts = new ObservableCollection<SerialPortInfo>(ports);
         if (ports.Any())
         {
-            SelectedPortName = ports.First();
+            SelectedSerialPort = ports.First();
         }
-
-        _telemetryService.TelemetryUpdated += (s, telemetry) =>
-        {
-            CurrentTelemetry = telemetry;
-        };
     }
 
-    private void OnAvailableSerialPortsChanged(object? sender, IEnumerable<string> ports)
+    private void OnAvailableSerialPortsChanged(object? sender, IEnumerable<SerialPortInfo> ports)
     {
         Dispatcher.UIThread.Post(() =>
         {
@@ -82,9 +83,10 @@ public partial class ConnectionPageViewModel : ViewModelBase
                 AvailableSerialPorts.Add(port);
             }
 
-            if (AvailableSerialPorts.Any() && (string.IsNullOrEmpty(SelectedPortName) || !AvailableSerialPorts.Contains(SelectedPortName)))
+            var selectedPortName = SelectedSerialPort?.PortName;
+            if (AvailableSerialPorts.Any() && (selectedPortName == null || !AvailableSerialPorts.Any(p => p.PortName == selectedPortName)))
             {
-                SelectedPortName = AvailableSerialPorts.First();
+                SelectedSerialPort = AvailableSerialPorts.First();
             }
         });
     }
@@ -101,14 +103,16 @@ public partial class ConnectionPageViewModel : ViewModelBase
             {
                 // Start telemetry when connected
                 _telemetryService.Start();
+                _downloadInProgress = true;
+                StatusMessage = "Connected - Downloading parameters...";
             }
             else
             {
-                // Stop telemetry when disconnected
-                _telemetryService.Stop();
-                
-                // Clear telemetry data
-                CurrentTelemetry = null;
+                var interruptedDownload = _downloadInProgress && !_parameterService.IsParameterDownloadComplete;
+                StatusMessage = interruptedDownload
+                    ? "Disconnected during parameter download"
+                    : "Disconnected";
+                _downloadInProgress = false;
             }
         }
         catch (Exception ex)
@@ -123,13 +127,32 @@ public partial class ConnectionPageViewModel : ViewModelBase
         ConnectionStatusBrush = brush;
     }
 
+    private void OnParameterDownloadProgressChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            _downloadInProgress = _parameterService.IsParameterDownloadInProgress;
+            if (_parameterService.IsParameterDownloadInProgress)
+            {
+                var expected = _parameterService.ExpectedParameterCount.HasValue
+                    ? _parameterService.ExpectedParameterCount.Value.ToString()
+                    : "?";
+                StatusMessage = $"Downloading parameters... {_parameterService.ReceivedParameterCount}/{expected}";
+            }
+            else if (_parameterService.IsParameterDownloadComplete && _connectionService.IsConnected)
+            {
+                StatusMessage = "Connected - Parameters loaded";
+            }
+        });
+    }
+
     [RelayCommand]
     private async Task ConnectAsync()
     {
         var settings = new ConnectionSettings
         {
             Type = ConnectionType,
-            PortName = SelectedPortName,
+            PortName = SelectedSerialPort?.PortName ?? string.Empty,
             BaudRate = BaudRate,
             IpAddress = IpAddress,
             Port = TcpPort

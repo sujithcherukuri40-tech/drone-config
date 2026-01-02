@@ -52,6 +52,27 @@ public partial class App : Application
         services.AddTransient<SafetyPageViewModel>();
         services.AddTransient<AirframePageViewModel>();
         services.AddTransient<ProfilePageViewModel>();
+        services.AddLogging(builder =>
+        {
+            builder.AddConsole();
+            builder.SetMinimumLevel(LogLevel.Information);
+        });
+
+        // Core services
+        services.AddSingleton<IConnectionService, ConnectionService>();
+        services.AddSingleton<IParameterService, ParameterService>();
+        services.AddSingleton<ICalibrationService, CalibrationService>();
+        services.AddSingleton<ISafetyService, SafetyService>();
+        services.AddSingleton<IPersistenceService, PersistenceService>();
+
+        // ViewModels
+        services.AddTransient<MainWindowViewModel>();
+        services.AddTransient<ConnectionPageViewModel>();
+        services.AddTransient<AirframePageViewModel>();
+        services.AddTransient<ParametersPageViewModel>();
+        services.AddTransient<CalibrationPageViewModel>();
+        services.AddTransient<SafetyPageViewModel>();
+        services.AddTransient<ProfilePageViewModel>();
 
         Services = services.BuildServiceProvider();
     }

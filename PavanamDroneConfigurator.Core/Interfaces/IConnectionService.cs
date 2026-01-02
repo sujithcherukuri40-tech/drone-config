@@ -14,4 +14,6 @@ public interface IConnectionService
     event EventHandler<IEnumerable<string>>? AvailableSerialPortsChanged;
     void RegisterParameterService(IParameterService parameterService);
     Stream? GetTransportStream();
+    IEnumerable<SerialPortInfo> GetAvailableSerialPorts();
+    event EventHandler<IEnumerable<SerialPortInfo>>? AvailableSerialPortsChanged;
 }

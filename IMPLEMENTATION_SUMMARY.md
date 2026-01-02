@@ -39,15 +39,7 @@ All drone interactions use proper MAVLink commands:
 - param1: 1 (MAV_MODE_FLAG_CUSTOM_MODE_ENABLED)
 - param2: Mode number (ArduPilot-specific)
 
-### 2. **Realtime Telemetry Display** ✅
-Connection page shows live drone data:
-- **Battery**: Voltage, Current, Remaining %
-- **GPS**: Latitude, Longitude, Altitude, Satellite Count, Status
-- **Attitude**: Roll, Pitch, Yaw (in degrees)
-- **Status**: Flight Mode, Armed/Disarmed, Ground Speed, Air Speed
-- **Connection**: Link Quality, Packet Rate
-
-### 3. **Automatic Parameter Loading** ✅
+### 2. **Automatic Parameter Loading** ✅
 On connection (like Mission Planner):
 - Automatically downloads all parameters using PARAM_REQUEST_LIST
 - Shows progress: "Loading parameters... X/Y"
@@ -55,13 +47,12 @@ On connection (like Mission Planner):
 - Auto-detects frame type from FRAME_TYPE or FRAME_CLASS parameters
 - Supports ArduPilot frame types: Plus, X, V, H, Octa variants, Y6, etc.
 
-### 4. **Comprehensive Service Architecture** ✅
+### 3. **Comprehensive Service Architecture** ✅
 
 #### Core Services
 - **IMavlinkService**: Connection, commands, parameters, telemetry
 - **ICalibrationService**: All sensor calibrations
 - **IParameterService**: Parameter read/write operations
-- **ITelemetryService**: Realtime telemetry streams
 - **IMotorTestService**: Motor testing with safety checks
 - **IArmingService**: Arm/disarm/reboot operations
 - **IFlightModeService**: Flight mode management
@@ -69,7 +60,7 @@ On connection (like Mission Planner):
 #### 50+ MAVLink Commands Supported
 Including navigation, condition, DO commands, preflight, mission, camera, mount, and gimbal commands.
 
-### 5. **UI Components Completed** ✅
+### 4. **UI Components Completed** ✅
 
 #### Views
 - **ConnectionView**: Serial/TCP/UDP configuration + realtime data panel

@@ -50,6 +50,14 @@
                                   SelectedItem="{Binding SelectedPortName}"
                                   IsEnabled="{Binding !IsConnected}"
                                   HorizontalAlignment="Stretch" />
+                                  SelectedItem="{Binding SelectedSerialPort}"
+                                  IsEnabled="{Binding !IsConnected}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                     </StackPanel>
                     <StackPanel Spacing="8">
                         <TextBlock Text="Baud Rate" FontWeight="SemiBold" />
@@ -114,6 +122,7 @@
                     </Grid>
                 </StackPanel>
             </Border>
+            <TextBlock Text="{Binding StatusMessage}" FontWeight="Bold" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

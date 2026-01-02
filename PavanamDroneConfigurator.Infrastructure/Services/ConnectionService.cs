@@ -21,7 +21,6 @@ namespace PavanamDroneConfigurator.Infrastructure.Services;
 public class ConnectionService : IConnectionService, IDisposable
 {
     private readonly ILogger<ConnectionService> _logger;
-    private IParameterService? _parameterService;
     private readonly IParameterService _parameterService;
     private readonly object _sendLock = new();
     private SerialPort? _serialPort;
@@ -83,7 +82,7 @@ public class ConnectionService : IConnectionService, IDisposable
 
     public void RegisterParameterService(IParameterService parameterService)
     {
-        _parameterService = parameterService;
+        // Registration is handled in constructor - this method exists to satisfy interface contract
     }
 
     public async Task<bool> ConnectAsync(ConnectionSettings settings)
@@ -269,28 +268,11 @@ public class ConnectionService : IConnectionService, IDisposable
                         return;
                     }
 
-                    byte systemId = _rxBuffer[3];
-                    byte componentId = _rxBuffer[4];
-                    byte messageId = _rxBuffer[5];
-
-                    // Extract payload
-                    byte[] payload = new byte[payloadLen];
-                    for (int i = 0; i < payloadLen; i++)
-                    {
-                        payload[i] = _rxBuffer[6 + i];
-                    }
-
-                    // Process different message types
-                    if (messageId == 0)
                     byte payloadLen = _rxBuffer[1];
                     int frameLength = payloadLen + 8;
                     if (_rxBuffer.Count < frameLength)
                     {
                         return;
-                    }
-                    else if (messageId == 22) // PARAM_VALUE
-                    {
-                        ProcessParameterValue(payload);
                     }
 
                     var frame = _rxBuffer.Take(frameLength).ToArray();
@@ -313,27 +295,6 @@ public class ConnectionService : IConnectionService, IDisposable
                     if (_rxBuffer.Count < frameLength)
                     {
                         return;
-                    }
-
-                    byte systemId = _rxBuffer[5];
-                    byte componentId = _rxBuffer[6];
-                    int messageId = _rxBuffer[7] | (_rxBuffer[8] << 8) | (_rxBuffer[9] << 16);
-
-                    // Extract payload
-                    byte[] payload = new byte[payloadLen];
-                    for (int i = 0; i < payloadLen; i++)
-                    {
-                        payload[i] = _rxBuffer[10 + i];
-                    }
-
-                    // Process different message types
-                    if (messageId == 0)
-                    {
-                        OnHeartbeatReceived(systemId, componentId);
-                    }
-                    else if (messageId == 22) // PARAM_VALUE
-                    {
-                        ProcessParameterValue(payload);
                     }
 
                     var frame = _rxBuffer.Take(frameLength).ToArray();
@@ -385,6 +346,8 @@ public class ConnectionService : IConnectionService, IDisposable
         {
             _logger.LogError(ex, "Error processing PARAM_VALUE message");
         }
+    }
+
     private void HandleMavlinkFrame(ReadOnlySpan<byte> frame)
     {
         if (frame.IsEmpty)
@@ -769,6 +732,8 @@ public class ConnectionService : IConnectionService, IDisposable
         return _activeConnectionType == ConnectionType.Tcp
             ? _tcpClient?.GetStream()
             : _serialPort?.BaseStream;
+    }
+
     private SerialPortInfo[] EnumerateSerialPorts()
     {
         if (!OperatingSystem.IsWindows())

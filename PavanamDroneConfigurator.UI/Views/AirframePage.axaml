@@ -149,37 +149,6 @@
                 </Border>
 
             </StackPanel>
-        <StackPanel Margin="20" Spacing="12">
-            <TextBlock Text="Airframe" FontSize="24" FontWeight="Bold" />
-            <TextBlock Text="{Binding StatusMessage}" FontSize="14" />
-            <StackPanel Spacing="6">
-                <TextBlock Text="Frame Class" FontWeight="SemiBold" />
-                <ComboBox ItemsSource="{Binding FrameClasses}"
-                          SelectedItem="{Binding SelectedFrameClass}"
-                          IsEnabled="{Binding IsInteractionEnabled}"
-                          DisplayMemberBinding="{Binding DisplayName}"
-                          MinWidth="220" />
-            </StackPanel>
-
-            <StackPanel Spacing="6">
-                <TextBlock Text="Frame Type" FontWeight="SemiBold" />
-                <ComboBox ItemsSource="{Binding FrameTypes}"
-                          SelectedItem="{Binding SelectedFrameType}"
-                          IsEnabled="{Binding IsFrameTypeEnabled}"
-                          DisplayMemberBinding="{Binding DisplayName}"
-                          MinWidth="220" />
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                <Button Content="Update"
-                        Command="{Binding UpdateFrameCommand}"
-                        IsEnabled="{Binding CanUpdate}"
-                        MinWidth="140" />
-                <ProgressBar Width="120" Height="10" IsIndeterminate="True" IsVisible="{Binding IsApplying}" />
-            </StackPanel>
-
-            <TextBlock Text="FRAME_CLASS is written first. After confirmation, FRAME_TYPE is written when provided."
-                       Foreground="Gray" FontSize="12" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

@@ -19,30 +19,11 @@
         <Border Grid.Column="0" Background="#2C3E50" Padding="10">
             <StackPanel Spacing="5">
                 <Button Content="Connection" CommandParameter="{Binding ConnectionPage}" Click="NavButton_Click" />
-                <Button Content="Telemetry" CommandParameter="{Binding TelemetryPage}" Click="NavButton_Click" />
-                <Button Content="Parameters" CommandParameter="{Binding ParametersPage}" Click="NavButton_Click" />
+                <Button Content="Airframe" CommandParameter="{Binding AirframePage}" Click="NavButton_Click" IsEnabled="{Binding CanAccessAirframe}" />
+                <Button Content="Parameters" CommandParameter="{Binding ParametersPage}" Click="NavButton_Click" IsEnabled="{Binding CanAccessParameters}" />
                 <Button Content="Calibration" CommandParameter="{Binding CalibrationPage}" Click="NavButton_Click" />
                 <Button Content="Safety" CommandParameter="{Binding SafetyPage}" Click="NavButton_Click" />
-                <Button Content="Airframe" CommandParameter="{Binding AirframePage}" Click="NavButton_Click" />
                 <Button Content="Profiles" CommandParameter="{Binding ProfilePage}" Click="NavButton_Click" />
-            </StackPanel>
-        </Border>
-        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
-        x:Class="PavanamDroneConfigurator.UI.Views.MainWindow"
-        x:DataType="vm:MainWindowViewModel"
-        Title="Pavanam Drone Configurator"
-        Width="1200" Height="700">
-
-    <Grid ColumnDefinitions="200,*">
-        <!-- Navigation Sidebar -->
-        <Border Grid.Column="0" Background="#2C3E50" Padding="10">
-            <StackPanel Spacing="5">
-                <Button Content="Connection" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ConnectionPage}" CommandParameter="{Binding ConnectionPage}" Click="NavButton_Click" />
-                <Button Content="Airframe" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).AirframePage}" CommandParameter="{Binding AirframePage}" Click="NavButton_Click" IsEnabled="{Binding CanAccessAirframe}" />
-                <Button Content="Parameters" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ParametersPage}" CommandParameter="{Binding ParametersPage}" Click="NavButton_Click" IsEnabled="{Binding CanAccessParameters}" />
-                <Button Content="Calibration" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CalibrationPage}" CommandParameter="{Binding CalibrationPage}" Click="NavButton_Click" />
-                <Button Content="Safety" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SafetyPage}" CommandParameter="{Binding SafetyPage}" Click="NavButton_Click" />
-                <Button Content="Profiles" Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ProfilePage}" CommandParameter="{Binding ProfilePage}" Click="NavButton_Click" />
             </StackPanel>
         </Border>
 
@@ -63,9 +44,6 @@
                 </DataTemplate>
                 <DataTemplate DataType="vm:SafetyPageViewModel">
                     <views:SafetyPage />
-                </DataTemplate>
-                <DataTemplate DataType="vm:AirframePageViewModel">
-                    <views:AirframePage />
                 </DataTemplate>
                 <DataTemplate DataType="vm:ProfilePageViewModel">
                     <views:ProfilePage />

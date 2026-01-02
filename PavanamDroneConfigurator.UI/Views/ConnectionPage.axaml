@@ -47,9 +47,6 @@
                     <StackPanel Spacing="8">
                         <TextBlock Text="Port Name" FontWeight="SemiBold" />
                         <ComboBox ItemsSource="{Binding AvailableSerialPorts}"
-                                  SelectedItem="{Binding SelectedPortName}"
-                                  IsEnabled="{Binding !IsConnected}"
-                                  HorizontalAlignment="Stretch" />
                                   SelectedItem="{Binding SelectedSerialPort}"
                                   IsEnabled="{Binding !IsConnected}">
                             <ComboBox.ItemTemplate>

@@ -11,6 +11,7 @@ public partial class SafetyPageViewModel : ViewModelBase
 {
     private readonly ISafetyService _safetyService;
     private readonly IConnectionService _connectionService;
+    private readonly IParameterService _parameterService;
 
     [ObservableProperty]
     private string _statusMessage = string.Empty;
@@ -120,10 +121,11 @@ public partial class SafetyPageViewModel : ViewModelBase
         FailsafeAction.Disarm
     };
 
-    public SafetyPageViewModel(ISafetyService safetyService, IConnectionService connectionService)
+    public SafetyPageViewModel(ISafetyService safetyService, IConnectionService connectionService, IParameterService parameterService)
     {
         _safetyService = safetyService;
         _connectionService = connectionService;
+        _parameterService = parameterService;
 
         _connectionService.ConnectionStateChanged += OnConnectionStateChanged;
         _parameterService.ParameterUpdated += OnParameterUpdated;

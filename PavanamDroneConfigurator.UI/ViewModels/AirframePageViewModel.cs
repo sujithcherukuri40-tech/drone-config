@@ -41,20 +41,17 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
 {
     private readonly IParameterService _parameterService;
     private readonly IConnectionService _connectionService;
-    private bool _isSyncingFromParameters;
-    private int? _lastFrameTypeValue;
-    private readonly SemaphoreSlim _syncLock = new(1, 1);
-    private Task _scheduledSync = Task.CompletedTask;
-    private readonly object _scheduledSyncGate = new();
-    private bool _disposed;
-    // Small tolerance used when interpreting cached float parameters as integral values.
-    // MAVLink param values are floats; float.Epsilon is too small once values grow, so a 1e-4 window
-    // guards against minor transport rounding while still treating parameters as integers.
-    private const float ParameterEqualityTolerance = 0.0001f;
-    private static readonly TimeSpan SyncTimeout = TimeSpan.FromSeconds(5);
 
-    private static readonly IReadOnlyList<FrameClassOption> FrameClassCatalog = new List<FrameClassOption>
-    {
+    private readonly SemaphoreSlim _syncLock = new(1, 1);
+    private bool _isSyncing;
+    private bool _disposed;
+    private int? _lastFrameType;
+
+    private const float FloatTolerance = 0.0001f;
+
+    // ---- Catalog (matches ArduPilot) ----
+    private static readonly IReadOnlyList<FrameClassOption> FrameClassCatalog =
+    [
         new(0, "Plane"),
         new(1, "Quad"),
         new(2, "Hexa"),
@@ -69,51 +66,34 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         new(11, "Heli Dual"),
         new(12, "DodecaHexa"),
         new(13, "Y4"),
-        new(14, "Deca"),
-    };
+        new(14, "Deca")
+    ];
 
-    private static readonly IReadOnlyList<FrameTypeOption> FrameTypeCatalog = new List<FrameTypeOption>
-    {
+    private static readonly IReadOnlyList<FrameTypeOption> FrameTypeCatalog =
+    [
         new(0, "Plus"),
         new(1, "X"),
         new(2, "V"),
         new(3, "H"),
-        new(4, "V-Tail"),
-    };
+        new(4, "V-Tail")
+    ];
 
-    [ObservableProperty]
-    private ObservableCollection<FrameClassOption> _frameClasses = new(FrameClassCatalog);
+    // ---- UI State ----
+    [ObservableProperty] private ObservableCollection<FrameClassOption> _frameClasses = new(FrameClassCatalog);
+    [ObservableProperty] private ObservableCollection<FrameTypeOption> _frameTypes = new();
+    [ObservableProperty] private FrameClassOption? _selectedFrameClass;
+    [ObservableProperty] private FrameTypeOption? _selectedFrameType;
+    [ObservableProperty] private string _statusMessage = "Waiting for parameters…";
+    [ObservableProperty] private bool _isApplying;
+    [ObservableProperty] private bool _isPageEnabled;
 
-    [ObservableProperty]
-    private ObservableCollection<FrameTypeOption> _frameTypes = new(FrameTypeCatalog);
+    public bool CanUpdate =>
+        IsPageEnabled &&
+        !_isApplying &&
+        SelectedFrameClass != null &&
+        (_lastFrameType == null || SelectedFrameType != null);
 
-    [ObservableProperty]
-    private FrameClassOption? _selectedFrameClass;
-
-    [ObservableProperty]
-    private FrameTypeOption? _selectedFrameType;
-
-    [ObservableProperty]
-    private string _statusMessage = "Connect and download parameters to configure frame.";
-
-    [ObservableProperty]
-    private bool _isApplying;
-
-    [ObservableProperty]
-    private bool _isPageEnabled;
-
-    public bool IsInteractionEnabled => IsPageEnabled && !IsApplying;
-    public bool IsFrameTypeEnabled => IsInteractionEnabled && FrameTypes.Count > 0;
-    // Frame type is only required when we know the vehicle already has a frame type value
-    // (from cache) or the operator picked one explicitly. This allows overwriting even if the
-    // parameter was missing while still demanding an explicit type when one exists.
-    private bool FrameTypeSelectionIsRequired()
-    {
-        return FrameTypes.Count > 0 && (_lastFrameTypeValue.HasValue || SelectedFrameType != null);
-    }
-
-    public bool CanUpdate => CanExecuteUpdate();
-
+    // ---- ctor ----
     public AirframePageViewModel(IParameterService parameterService, IConnectionService connectionService)
     {
         _parameterService = parameterService;
@@ -123,513 +103,187 @@ public partial class AirframePageViewModel : ViewModelBase, IDisposable
         _parameterService.ParameterUpdated += OnParameterUpdated;
         _parameterService.ParameterDownloadProgressChanged += OnParameterDownloadProgressChanged;
 
-        SafeFireAndForget(UpdateAvailabilityAsync());
+        UpdateAvailability();
     }
 
-    partial void OnSelectedFrameClassChanged(FrameClassOption? value)
-    {
-        OnPropertyChanged(nameof(CanUpdate));
-        var preferredType = _isSyncingFromParameters ? _lastFrameTypeValue : null;
-        BuildFrameTypeOptions(preferredType);
+    // ---- Event handlers ----
 
-        if (_isSyncingFromParameters)
+    private void OnConnectionStateChanged(object? sender, bool connected)
+    {
+        Dispatcher.UIThread.Post(UpdateAvailability);
+    }
+
+    private void OnParameterDownloadProgressChanged(object? sender, EventArgs e)
+    {
+        if (_parameterService.IsParameterDownloadComplete)
         {
+            Dispatcher.UIThread.Post(() => _ = SyncFromCacheAsync(true));
+        }
+        else if (_parameterService.IsParameterDownloadInProgress)
+        {
+            StatusMessage = $"Downloading parameters… {_parameterService.ReceivedParameterCount}/{_parameterService.ExpectedParameterCount ?? 0}";
+        }
+    }
+
+    private void OnParameterUpdated(object? sender, string paramName)
+    {
+        if (paramName.Equals("FRAME_CLASS", StringComparison.OrdinalIgnoreCase) ||
+            paramName.Equals("FRAME_TYPE", StringComparison.OrdinalIgnoreCase))
+        {
+            Dispatcher.UIThread.Post(() => _ = SyncFromCacheAsync(false));
+        }
+    }
+
+    // ---- Core sync logic ----
+
+    private async Task SyncFromCacheAsync(bool forceStatus)
+    {
+        if (!_connectionService.IsConnected || !_parameterService.IsParameterDownloadComplete)
             return;
-        }
 
-        SelectedFrameType = null;
-
-        if (IsInteractionEnabled)
+        await _syncLock.WaitAsync();
+        try
         {
-            StatusMessage = value != null
-                ? $"Frame class selected: {value.DisplayName} ({value.Value})."
-                : "Select a frame class.";
+            _isSyncing = true;
+
+            var classParam = await _parameterService.GetParameterAsync("FRAME_CLASS");
+            var typeParam = await _parameterService.GetParameterAsync("FRAME_TYPE");
+
+            var classValue = ParseInt(classParam);
+            var typeValue = ParseInt(typeParam);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                // Frame Class
+                SelectedFrameClass = EnsureFrameClass(classValue);
+
+                // Frame Types (only if applicable)
+                FrameTypes.Clear();
+                if (classValue.HasValue && classValue.Value != 0)
+                {
+                    foreach (var t in FrameTypeCatalog)
+                        FrameTypes.Add(t);
+
+                    SelectedFrameType = EnsureFrameType(typeValue);
+                }
+                else
+                {
+                    SelectedFrameType = null;
+                }
+
+                _lastFrameType = typeValue;
+
+                IsPageEnabled = true;
+                OnPropertyChanged(nameof(CanUpdate));
+
+                if (forceStatus && SelectedFrameClass != null)
+                {
+                    StatusMessage = SelectedFrameType != null
+                        ? $"Current airframe: {SelectedFrameClass.DisplayName} {SelectedFrameType.DisplayName}"
+                        : $"Current airframe: {SelectedFrameClass.DisplayName}";
+                }
+            });
         }
-    }
-
-    partial void OnSelectedFrameTypeChanged(FrameTypeOption? value)
-    {
-        OnPropertyChanged(nameof(CanUpdate));
-
-        if (_isSyncingFromParameters)
+        catch (Exception ex)
         {
-            return;
+            Debug.WriteLine(ex);
         }
-
-        if (IsInteractionEnabled && value != null)
+        finally
         {
-            StatusMessage = $"Frame type selected: {value.DisplayName} ({value.Value}).";
+            _isSyncing = false;
+            _syncLock.Release();
         }
     }
 
-    partial void OnIsApplyingChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanUpdate));
-        OnPropertyChanged(nameof(IsInteractionEnabled));
-        OnPropertyChanged(nameof(IsFrameTypeEnabled));
-    }
-
-    partial void OnIsPageEnabledChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanUpdate));
-        OnPropertyChanged(nameof(IsInteractionEnabled));
-        OnPropertyChanged(nameof(IsFrameTypeEnabled));
-    }
-
-    partial void OnFrameTypesChanged(ObservableCollection<FrameTypeOption> value)
-    {
-        OnPropertyChanged(nameof(IsFrameTypeEnabled));
-        OnPropertyChanged(nameof(CanUpdate));
-    }
+    // ---- Apply ----
 
     [RelayCommand]
     private async Task UpdateFrameAsync()
     {
-        if (!IsInteractionEnabled)
-        {
-            StatusMessage = "Frame updates require connection and downloaded parameters.";
+        if (!CanUpdate)
             return;
-        }
-
-        if (SelectedFrameClass == null)
-        {
-            StatusMessage = "Select a frame class before updating.";
-            return;
-        }
-
-        var frameClassResult = false;
-        var frameClassAttempted = false;
-        var frameTypeResult = false;
-        var frameTypeAttempted = false;
 
         try
         {
             IsApplying = true;
-            StatusMessage = $"Writing FRAME_CLASS = {SelectedFrameClass.Value}...";
-            frameClassAttempted = true;
-            frameClassResult = await _parameterService.SetParameterAsync("FRAME_CLASS", SelectedFrameClass.Value);
+            StatusMessage = "Applying airframe…";
 
-            if (!frameClassResult)
+            if (!await _parameterService.SetParameterAsync("FRAME_CLASS", SelectedFrameClass!.Value))
             {
-                StatusMessage = "FRAME_CLASS was not confirmed. No changes applied.";
+                StatusMessage = "FRAME_CLASS write failed.";
                 return;
             }
 
             if (SelectedFrameType != null)
             {
-                StatusMessage = $"FRAME_CLASS confirmed. Writing FRAME_TYPE = {SelectedFrameType.Value}...";
-                frameTypeAttempted = true;
-                frameTypeResult = await _parameterService.SetParameterAsync("FRAME_TYPE", SelectedFrameType.Value);
-            }
-
-            var frameTypeConfirmed = !frameTypeAttempted || frameTypeResult;
-
-            if (frameClassResult && frameTypeConfirmed)
-            {
-                if (SelectedFrameType != null)
+                if (!await _parameterService.SetParameterAsync("FRAME_TYPE", SelectedFrameType.Value))
                 {
-                    _lastFrameTypeValue = SelectedFrameType.Value;
+                    StatusMessage = "FRAME_TYPE write failed.";
+                    return;
                 }
-                OnPropertyChanged(nameof(CanUpdate));
-                StatusMessage = "Frame parameters updated after confirmation.";
             }
-            else
-            {
-                StatusMessage = frameTypeAttempted
-                    ? "FRAME_TYPE was not confirmed. Frame update incomplete."
-                    : "FRAME_CLASS was not confirmed. Frame update incomplete.";
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error updating frame: {ex.Message}";
+
+            StatusMessage = "Airframe updated successfully.";
         }
         finally
         {
             IsApplying = false;
-            // Re-sync from the parameter cache only when a write was attempted and any write failed,
-            // so the UI reflects the last confirmed values instead of optimistic selections.
-            if (HasAttemptedWrites(frameClassAttempted, frameTypeAttempted) &&
-                HasFailedWrites(frameClassResult, frameTypeAttempted, frameTypeResult))
-            {
-                using var syncCts = new CancellationTokenSource(SyncTimeout);
-                await SyncFromParametersAsync(forceStatusUpdate: true, cancellationToken: syncCts.Token);
-            }
+            OnPropertyChanged(nameof(CanUpdate));
         }
     }
 
-    private void OnConnectionStateChanged(object? sender, bool connected)
+    // ---- Helpers ----
+
+    private static int? ParseInt(DroneParameter? p)
     {
-        Dispatcher.UIThread.Post(() => SafeFireAndForget(UpdateAvailabilityAsync()));
+        if (p == null) return null;
+        var rounded = (int)Math.Round(p.Value);
+        return Math.Abs(p.Value - rounded) < FloatTolerance ? rounded : null;
     }
 
-    private void OnParameterUpdated(object? sender, string parameterName)
+    private FrameClassOption? EnsureFrameClass(int? value)
     {
-        if (!IsFrameParameter(parameterName))
-        {
-            return;
-        }
-
-        // Only force a status update when a download is not underway to avoid overriding live progress text.
-        var forceStatusUpdate = !_parameterService.IsParameterDownloadInProgress;
-        ScheduleSyncFromParameters(forceStatusUpdate);
+        if (!value.HasValue) return null;
+        return FrameClasses.FirstOrDefault(f => f.Value == value)
+               ?? new FrameClassOption(value.Value, $"Unknown ({value.Value})");
     }
 
-    private async Task UpdateAvailabilityAsync()
+    private FrameTypeOption? EnsureFrameType(int? value)
     {
-        await UpdatePageEnabledAsync();
+        if (!value.HasValue) return null;
+        return FrameTypes.FirstOrDefault(t => t.Value == value)
+               ?? new FrameTypeOption(value.Value, $"Unknown ({value.Value})");
+    }
 
+    private void UpdateAvailability()
+    {
         if (!_connectionService.IsConnected)
         {
-            StatusMessage = "Connect to a vehicle to edit FRAME_CLASS and FRAME_TYPE.";
-            return;
-        }
-
-        if (_parameterService.IsParameterDownloadInProgress)
-        {
-            StatusMessage = BuildParameterDownloadStatus();
+            IsPageEnabled = false;
+            StatusMessage = "Connect to vehicle.";
             return;
         }
 
         if (_parameterService.IsParameterDownloadComplete)
         {
-            ScheduleSyncFromParameters(forceStatusUpdate: true);
+            _ = SyncFromCacheAsync(true);
         }
         else
         {
-            var (frameClass, frameType) = await GetCachedFrameParametersAsync();
-            if (frameClass.HasValue || frameType.HasValue)
-            {
-                ScheduleSyncFromParameters(forceStatusUpdate: true);
-            }
-            else
-            {
-                StatusMessage = "Waiting for parameters...";
-            }
+            StatusMessage = "Waiting for parameters…";
         }
     }
 
-    private void OnParameterDownloadProgressChanged(object? sender, EventArgs e)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            if (_parameterService.IsParameterDownloadComplete)
-            {
-                SafeFireAndForget(UpdateAvailabilityAsync());
-            }
-            else if (_parameterService.IsParameterDownloadInProgress)
-            {
-                StatusMessage = BuildParameterDownloadStatus();
-            }
-            else
-            {
-                StatusMessage = "Waiting for parameters...";
-            }
-        });
-    }
-
-    private async Task SyncFromParametersAsync(bool forceStatusUpdate, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            await _syncLock.WaitAsync(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            await ResetSyncingStateAsync();
-            return;
-        }
-
-        try
-        {
-            if (!_connectionService.IsConnected)
-            {
-                return;
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var frameClassParam = await _parameterService.GetParameterAsync("FRAME_CLASS");
-            cancellationToken.ThrowIfCancellationRequested();
-            var frameTypeParam = await _parameterService.GetParameterAsync("FRAME_TYPE");
-
-            var frameClassValue = TryParseParameterValue(frameClassParam);
-            var frameTypeValue = TryParseParameterValue(frameTypeParam);
-
-<<<<<<< HEAD
-        Dispatcher.UIThread.Post(() =>
-    {
-        _isSyncingFromParameters = true;
-        _lastFrameTypeValue = frameTypeValue;
-
-        var selectedClass = EnsureFrameClassOption(frameClassValue);
-        SelectedFrameClass = selectedClass;
-
-        BuildFrameTypeOptions(frameTypeValue);
-        SelectedFrameType = frameTypeValue.HasValue
-            ? FrameTypes.FirstOrDefault(t => t.Value == frameTypeValue.Value)
-            : null;
-
-        if (forceStatusUpdate)
-        {
-            if (frameClassValue.HasValue)
-            {
-                var typeText = frameTypeValue.HasValue ? frameTypeValue.Value.ToString() : "unset";
-                StatusMessage = $"FRAME_CLASS={frameClassValue.Value}, FRAME_TYPE={typeText}.";
-            }
-            else
-            {
-                StatusMessage = "Waiting for parameters...";
-            }
-=======
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                _isSyncingFromParameters = true;
-                _lastFrameTypeValue = frameTypeValue;
-
-                var selectedClass = EnsureFrameClassOption(frameClassValue);
-                SelectedFrameClass = selectedClass;
-
-                BuildFrameTypeOptions(frameTypeValue);
-                SelectedFrameType = frameTypeValue.HasValue
-                    ? FrameTypes.FirstOrDefault(t => t.Value == frameTypeValue.Value)
-                    : null;
-
-                ApplyPageEnabled(frameClassValue.HasValue);
-
-                if (forceStatusUpdate)
-                {
-                    if (_parameterService.IsParameterDownloadInProgress)
-                    {
-                        StatusMessage = BuildParameterDownloadStatus();
-                    }
-                    else if (frameClassValue.HasValue)
-                    {
-                        var frameClassName = SelectedFrameClass?.DisplayName ?? $"Unknown ({frameClassValue.Value})";
-                        if (SelectedFrameType != null)
-                        {
-                            StatusMessage = $"Current airframe: {frameClassName} {SelectedFrameType.DisplayName}";
-                        }
-                        else
-                        {
-                            StatusMessage = $"Current airframe: {frameClassName}";
-                        }
-                    }
-                    else if (_parameterService.IsParameterDownloadComplete)
-                    {
-                        StatusMessage = "FRAME_CLASS not available in cache.";
-                    }
-                    else
-                    {
-                        StatusMessage = "Waiting for parameters...";
-                    }
-                }
-
-                _isSyncingFromParameters = false;
-                OnPropertyChanged(nameof(CanUpdate));
-                OnPropertyChanged(nameof(IsFrameTypeEnabled));
-            });
->>>>>>> 4bb47fc69bd1cacc8dc45938ac55f54808db04fd
-        }
-
-        _isSyncingFromParameters = false;
-        OnPropertyChanged(nameof(CanUpdate));
-        OnPropertyChanged(nameof(IsFrameTypeEnabled));
-    });
-            }
-        catch (OperationCanceledException)
-        {
-            await ResetSyncingStateAsync();
-        }
-        catch (Exception ex)
-        {
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                _isSyncingFromParameters = false;
-                StatusMessage = $"Unable to sync frame parameters: {ex.Message}";
-            });
-        }
-        finally
-        {
-            _syncLock.Release();
-        }
-    }
-
-    private void ScheduleSyncFromParameters(bool forceStatusUpdate)
-    {
-        var syncTask = SyncFromParametersAsync(forceStatusUpdate);
-        lock (_scheduledSyncGate)
-        {
-            _scheduledSync = syncTask;
-        }
-
-        syncTask.ContinueWith(t =>
-        {
-            if (t.IsFaulted && t.Exception != null)
-            {
-                var message = t.Exception.GetBaseException().Message;
-                Dispatcher.UIThread.InvokeAsync(() => StatusMessage = $"Unable to sync frame parameters: {message}");
-            }
-        }, TaskScheduler.Default);
-    }
-
-    private Task ResetSyncingStateAsync()
-    {
-       Dispatcher.UIThread.Post(() => _isSyncingFromParameters = false);
-        return Task.CompletedTask;
-
-    }
-
-    private async Task UpdatePageEnabledAsync()
-    {
-        var (frameClass, _) = await GetCachedFrameParametersAsync();
-        ApplyPageEnabled(frameClass.HasValue);
-    }
-
-    private string BuildParameterDownloadStatus()
-    {
-        var expectedText = _parameterService.ExpectedParameterCount.HasValue
-            ? _parameterService.ExpectedParameterCount.Value.ToString()
-            : "?";
-        return $"Downloading parameters... ({_parameterService.ReceivedParameterCount} / {expectedText})";
-    }
-
-    private async Task<(int? frameClass, int? frameType)> GetCachedFrameParametersAsync()
-    {
-        var cachedFrameClass = await _parameterService.GetParameterAsync("FRAME_CLASS");
-        var cachedFrameType = await _parameterService.GetParameterAsync("FRAME_TYPE");
-
-        return (TryParseParameterValue(cachedFrameClass), TryParseParameterValue(cachedFrameType));
-    }
-
-    private void ApplyPageEnabled(bool hasCachedFrameClass)
-    {
-        var hasRequiredParameters = _parameterService.IsParameterDownloadComplete || hasCachedFrameClass;
-        IsPageEnabled = _connectionService.IsConnected && hasRequiredParameters;
-    }
-
-    private void SafeFireAndForget(Task task)
-    {
-        task.ContinueWith(t =>
-        {
-            var baseException = t.Exception?.GetBaseException();
-            var exceptionText = baseException?.ToString() ?? "Unknown error";
-            Debug.WriteLine($"Airframe sync error: {exceptionText}");
-            try
-            {
-                _ = Dispatcher.UIThread.InvokeAsync(() => StatusMessage = "Unable to sync frame parameters. Check connection and parameter download, then retry.");
-            }
-            catch (Exception dispatchException)
-            {
-                Debug.WriteLine($"Airframe sync error dispatch failed: {dispatchException}");
-            }
-        }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-    }
-
-    private static bool IsFrameParameter(string parameterName)
-    {
-        return parameterName.Equals("FRAME_CLASS", StringComparison.OrdinalIgnoreCase) ||
-               parameterName.Equals("FRAME_TYPE", StringComparison.OrdinalIgnoreCase);
-    }
+    // ---- Cleanup ----
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
+        if (_disposed) return;
         _disposed = true;
+
         _connectionService.ConnectionStateChanged -= OnConnectionStateChanged;
         _parameterService.ParameterUpdated -= OnParameterUpdated;
         _parameterService.ParameterDownloadProgressChanged -= OnParameterDownloadProgressChanged;
-        Task syncTask;
-        lock (_scheduledSyncGate)
-        {
-            syncTask = _scheduledSync ?? Task.CompletedTask;
-        }
-
-        syncTask.ContinueWith(_ => _syncLock.Dispose(), TaskScheduler.Default);
-    }
-
-    private void BuildFrameTypeOptions(int? currentTypeValue)
-    {
-        var options = new List<FrameTypeOption>(FrameTypeCatalog);
-        EnsureFrameTypeOption(currentTypeValue, options);
-
-        FrameTypes.Clear();
-        foreach (var option in options)
-        {
-            FrameTypes.Add(option);
-        }
-
-        OnPropertyChanged(nameof(IsFrameTypeEnabled));
-        OnPropertyChanged(nameof(CanUpdate));
-    }
-
-    private FrameClassOption? EnsureFrameClassOption(int? frameClassValue)
-    {
-        if (!frameClassValue.HasValue)
-        {
-            return null;
-        }
-
-        var existing = FrameClasses.FirstOrDefault(c => c.Value == frameClassValue.Value);
-        if (existing != null)
-        {
-            return existing;
-        }
-
-        var option = new FrameClassOption(frameClassValue.Value, $"Unknown ({frameClassValue.Value})");
-        FrameClasses.Add(option);
-        return option;
-    }
-
-    private FrameTypeOption? EnsureFrameTypeOption(int? frameTypeValue, List<FrameTypeOption> options)
-    {
-        if (!frameTypeValue.HasValue)
-        {
-            return null;
-        }
-
-        var existing = options.FirstOrDefault(t => t.Value == frameTypeValue.Value);
-        if (existing != null)
-        {
-            return existing;
-        }
-
-        var option = new FrameTypeOption(frameTypeValue.Value, $"Unknown ({frameTypeValue.Value})");
-        options.Add(option);
-        return option;
-    }
-
-    private bool CanExecuteUpdate()
-    {
-        // Interaction must be enabled, a frame class chosen, and if a frame type is required
-        // (known from cache or explicitly picked) it must also be selected.
-        return IsInteractionEnabled &&
-               SelectedFrameClass != null &&
-               (!FrameTypeSelectionIsRequired() || SelectedFrameType != null);
-    }
-
-    private static bool HasAttemptedWrites(bool frameClassAttempted, bool frameTypeAttempted)
-    {
-        return frameClassAttempted || frameTypeAttempted;
-    }
-
-    private static bool HasFailedWrites(bool frameClassResult, bool frameTypeAttempted, bool frameTypeResult)
-    {
-        return !frameClassResult || (frameTypeAttempted && !frameTypeResult);
-    }
-
-    private static int? TryParseParameterValue(DroneParameter? parameter)
-    {
-        if (parameter == null)
-        {
-            return null;
-        }
-
-        var parsed = (int)Math.Round(parameter.Value, MidpointRounding.AwayFromZero);
-        return Math.Abs(parameter.Value - parsed) < ParameterEqualityTolerance ? parsed : null;
     }
 }
+        

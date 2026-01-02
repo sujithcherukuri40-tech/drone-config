@@ -1,13 +1,12 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PavanamDroneConfigurator.Core.Interfaces;
 using PavanamDroneConfigurator.Core.Models;
-using System.Collections.ObjectModel;
-using System.Threading.Tasks;
 
 namespace PavanamDroneConfigurator.UI.ViewModels;
 
@@ -39,36 +38,8 @@ public partial class ParametersPageViewModel : ViewModelBase
         _parameterService.ParameterDownloadProgressChanged += OnParameterDownloadProgressChanged;
         _parameterService.ParameterUpdated += OnParameterUpdated;
         
-        // Subscribe to parameter updates
-        _parameterService.ParameterUpdated += OnParameterUpdated;
-        
         // Initialize can edit state
         CanEditParameters = _connectionService.IsConnected && _parameterService.IsParameterDownloadComplete;
-    }
-
-    private void OnParameterUpdated(object? sender, DroneParameter updatedParam)
-    {
-        try
-        {
-            // Find the parameter in the UI collection and update it
-            var existingParam = Parameters.FirstOrDefault(p => p.Name == updatedParam.Name);
-            if (existingParam != null)
-            {
-                // Update the existing parameter's value
-                existingParam.Value = updatedParam.Value;
-                existingParam.Description = updatedParam.Description;
-                StatusMessage = $"Parameter {updatedParam.Name} updated to {updatedParam.Value}";
-            }
-            else
-            {
-                // Add new parameter if it doesn't exist (for initial loads)
-                Parameters.Add(updatedParam);
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error updating parameter: {ex.Message}";
-        }
     }
 
     private async void OnConnectionStateChanged(object? sender, bool connected)
@@ -187,21 +158,7 @@ public partial class ParametersPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            StatusMessage = $"? Error saving parameter: {ex.Message}";
-        }
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            // Unsubscribe from events to prevent memory leaks
-            _connectionService.ConnectionStateChanged -= OnConnectionStateChanged;
-            _parameterService.ParameterUpdated -= OnParameterUpdated;
-            var updated = await _parameterService.SetParameterAsync(SelectedParameter.Name, SelectedParameter.Value);
-            StatusMessage = updated
-                ? $"Saved {SelectedParameter.Name} = {SelectedParameter.Value}"
-                : $"Failed to save {SelectedParameter.Name}";
+            StatusMessage = $"Error saving parameter: {ex.Message}";
         }
     }
 
@@ -260,6 +217,5 @@ public partial class ParametersPageViewModel : ViewModelBase
             Parameters.Clear();
             StatusMessage = "Disconnected - Parameters cleared";
         }
-        base.Dispose(disposing);
     }
 }

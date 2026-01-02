@@ -94,32 +94,6 @@
             </StackPanel>
 
             <TextBlock Text="{Binding StatusMessage}" FontWeight="SemiBold" FontSize="14" Foreground="#666" />
-
-            <Border BorderBrush="#E0E0E0" 
-                    BorderThickness="1" 
-                    CornerRadius="8"
-                    Padding="15" 
-                    Background="White"
-                    Margin="0,10,0,0" 
-                    IsVisible="{Binding IsConnected}">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Telemetry Data" FontSize="18" FontWeight="Bold" Margin="0,0,0,10" />
-                    <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Flight Mode:" FontWeight="SemiBold" />
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CurrentTelemetry.FlightMode}" />
-                        
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Armed:" FontWeight="SemiBold" />
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CurrentTelemetry.Armed}" />
-                        
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Battery:" FontWeight="SemiBold" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CurrentTelemetry.BatteryVoltage, StringFormat='{}{0:F2}V'}" />
-                        
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Satellites:" FontWeight="SemiBold" />
-                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CurrentTelemetry.SatelliteCount}" />
-                    </Grid>
-                </StackPanel>
-            </Border>
-            <TextBlock Text="{Binding StatusMessage}" FontWeight="Bold" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

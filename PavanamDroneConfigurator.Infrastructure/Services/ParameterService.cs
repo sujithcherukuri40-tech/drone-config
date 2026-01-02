@@ -16,6 +16,9 @@ public class ParameterService : IParameterService
     private const byte TargetSystemId = 1;
     private const byte TargetComponentId = 1;
     private const int ParameterTimeoutMs = 5000;
+    private const int EepromWriteTimeoutMs = 5000; // Timeout for initial PARAM_SET with EEPROM write
+    private const int VerificationTimeoutMs = 3000; // Timeout for verification reads
+    private const int EepromWriteDelayMs = 200; // Delay to allow EEPROM write to complete
     private byte _sequenceNumber = 0;
 
     public event EventHandler<DroneParameter>? ParameterUpdated;
@@ -122,36 +125,8 @@ public class ParameterService : IParameterService
             await SendParameterSetAsync(name, value);
             
             // Wait for the parameter to be updated (indicated by receiving PARAM_VALUE)
-            var startTime = DateTime.UtcNow;
-            var timeout = TimeSpan.FromMilliseconds(5000); // Increased to 5 seconds for EEPROM write
-            bool receivedUpdate = false;
-            
-            while ((DateTime.UtcNow - startTime) < timeout)
-            {
-                await Task.Delay(100);
-                
-                // Check if parameter was updated
-                if (_parameters.TryGetValue(name, out var param))
-                {
-                    _logger.LogDebug("Checking parameter {Name}: current={CurrentValue}, target={TargetValue}", 
-                        name, param.Value, value);
-                    
-                    // Allow small floating point differences
-                    if (Math.Abs(param.Value - value) < 0.001f)
-                    {
-                        receivedUpdate = true;
-                        _logger.LogInformation("✓ Successfully set parameter {Name} = {Value} (confirmed via PARAM_VALUE)", 
-                            name, value);
-                        break;
-                    }
-                    else if (Math.Abs(param.Value - beforeValue) > 0.001f)
-                    {
-                        // Value changed but not to what we expected
-                        _logger.LogWarning("Parameter {Name} changed from {Before} to {After}, but expected {Expected}", 
-                            name, beforeValue, param.Value, value);
-                    }
-                }
-            }
+            bool receivedUpdate = await VerifyParameterValueAsync(name, value, EepromWriteTimeoutMs, 
+                "Successfully set parameter", false);
             
             if (!receivedUpdate)
             {
@@ -159,38 +134,11 @@ public class ParameterService : IParameterService
                     "Attempting verification by re-reading parameter...", name, value);
                 
                 // Force a fresh read from the drone to verify the parameter was actually written
-                // Remove from cache first to ensure we get a fresh value
                 _parameters.TryRemove(name, out _);
-                
-                // Request the parameter from the drone
                 await RequestParameterReadAsync(name);
                 
-                // Wait for the response with a shorter timeout
-                var verifyStartTime = DateTime.UtcNow;
-                var verifyTimeout = TimeSpan.FromMilliseconds(3000);
-                bool verified = false;
-                
-                while ((DateTime.UtcNow - verifyStartTime) < verifyTimeout)
-                {
-                    await Task.Delay(100);
-                    
-                    if (_parameters.TryGetValue(name, out var verifyParam))
-                    {
-                        if (Math.Abs(verifyParam.Value - value) < 0.001f)
-                        {
-                            verified = true;
-                            _logger.LogInformation("✓ Parameter {Name} = {Value} verified by re-reading from drone", 
-                                name, value);
-                            break;
-                        }
-                        else
-                        {
-                            _logger.LogError("❌ Parameter {Name} verification failed: expected {Expected}, got {Actual}", 
-                                name, value, verifyParam.Value);
-                            return false;
-                        }
-                    }
-                }
+                bool verified = await VerifyParameterValueAsync(name, value, VerificationTimeoutMs,
+                    "Parameter verified by re-reading from drone", true);
                 
                 if (!verified)
                 {
@@ -202,35 +150,12 @@ public class ParameterService : IParameterService
             // Final verification: Re-read the parameter one more time to ensure it was persisted
             _logger.LogDebug("Performing final verification of parameter {Name}", name);
             _parameters.TryRemove(name, out _);
-            await Task.Delay(200); // Small delay to ensure EEPROM write completed
+            await Task.Delay(EepromWriteDelayMs); // Allow EEPROM write to complete
             
             await RequestParameterReadAsync(name);
             
-            var finalStartTime = DateTime.UtcNow;
-            var finalTimeout = TimeSpan.FromMilliseconds(3000);
-            bool finalVerified = false;
-            
-            while ((DateTime.UtcNow - finalStartTime) < finalTimeout)
-            {
-                await Task.Delay(100);
-                
-                if (_parameters.TryGetValue(name, out var finalParam))
-                {
-                    if (Math.Abs(finalParam.Value - value) < 0.001f)
-                    {
-                        finalVerified = true;
-                        _logger.LogInformation("✓✓ Parameter {Name} = {Value} CONFIRMED persisted on drone", 
-                            name, value);
-                        break;
-                    }
-                    else
-                    {
-                        _logger.LogError("❌ Final verification failed for {Name}: expected {Expected}, got {Actual}", 
-                            name, value, finalParam.Value);
-                        return false;
-                    }
-                }
-            }
+            bool finalVerified = await VerifyParameterValueAsync(name, value, VerificationTimeoutMs,
+                "Parameter CONFIRMED persisted on drone", true);
             
             return finalVerified;
         }
@@ -239,6 +164,39 @@ public class ParameterService : IParameterService
             _logger.LogError(ex, "Error setting parameter {Name}", name);
             return false;
         }
+    }
+
+    private async Task<bool> VerifyParameterValueAsync(string name, float expectedValue, int timeoutMs, 
+        string successMessage, bool logError)
+    {
+        var startTime = DateTime.UtcNow;
+        var timeout = TimeSpan.FromMilliseconds(timeoutMs);
+        
+        while ((DateTime.UtcNow - startTime) < timeout)
+        {
+            await Task.Delay(100);
+            
+            if (_parameters.TryGetValue(name, out var param))
+            {
+                _logger.LogDebug("Checking parameter {Name}: current={CurrentValue}, target={TargetValue}", 
+                    name, param.Value, expectedValue);
+                
+                // Allow small floating point differences
+                if (Math.Abs(param.Value - expectedValue) < 0.001f)
+                {
+                    _logger.LogInformation("✓ {Message}: {Name} = {Value}", successMessage, name, expectedValue);
+                    return true;
+                }
+                else if (logError)
+                {
+                    _logger.LogError("❌ Parameter {Name} verification failed: expected {Expected}, got {Actual}", 
+                        name, expectedValue, param.Value);
+                    return false;
+                }
+            }
+        }
+        
+        return false;
     }
 
     public async Task RefreshParametersAsync()
